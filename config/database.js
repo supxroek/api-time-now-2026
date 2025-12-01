@@ -2,7 +2,7 @@ const mysql = require("mysql2/promise");
 const fs = require("fs");
 
 /**
- * /api/config/database.js
+ * /config/database.js
  *
  * การเชื่อมต่อ MySQL พร้อมการรองรับ SSL และการแยกสภาพแวดล้อม
  * - Development: การเชื่อมต่อ TCP แบบง่าย (optional local SSL)

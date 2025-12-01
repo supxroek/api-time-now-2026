@@ -62,7 +62,7 @@ app.get("/health", (req, res) => {
   const version = pkg && pkg.version ? pkg.version : "unknown";
   const mem = process.memoryUsage();
   // เช็คสถานะของ database
-  const db = require("./api/config/database");
+  const db = require("./config/database");
   db.getConnection((err, connection) => {
     if (err) {
       console.error("Database connection error:", err);
