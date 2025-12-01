@@ -8,6 +8,7 @@
 const express = require("express");
 const router = express.Router();
 
+// import controllers and middleware
 const companyController = require("../controllers/company.controller");
 const { mockAuth, authorize } = require("../middleware/auth.middleware");
 const {
@@ -18,29 +19,12 @@ const {
 // ใช้ mockAuth สำหรับทดสอบ (เปลี่ยนเป็น authenticate เมื่อมีระบบ login)
 router.use(mockAuth);
 
-/**
- * @route   GET /api/company/profile
- * @desc    ดึงข้อมูล Profile ของบริษัท
- * @access  Private (HR/Admin)
- */
-router.get("/profile", companyController.getProfile);
-
-/**
- * @route   PUT /api/company/profile
- * @desc    แก้ไขข้อมูล Profile ของบริษัท
- * @access  Private (HR/Admin)
- */
-router.put(
-  "/profile",
-  validate(companySchemas.updateProfile),
-  companyController.updateProfile
+// กำหนดเส้นทาง API ที่นี้
+// ตัวอย่าง: ดึงข้อมูลโปรไฟล์บริษัท
+router.get(
+  "/",
+  authorize("admin", "user"),
+  companyController.getExample
 );
-
-/**
- * @route   GET /api/company/subscription
- * @desc    ดึงสถานะ Subscription
- * @access  Private (Admin)
- */
-router.get("/subscription", companyController.getSubscription);
 
 module.exports = router;

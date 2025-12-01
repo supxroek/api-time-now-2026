@@ -45,11 +45,9 @@ app
   .use(limiter);
 
 /** --------------------------------------------------------------------
- * จัดการ route ต่างๆ ที่นี่
+ * เรียกใช้ route ทั้งหมดจาก src/app.js
  */
-const routes = require("./api/routes");
-const { errorHandler } = require("./api/middleware/error.middleware");
-
+const routes = require("./src/app");
 // Mount all API routes
 app.use(routes);
 
@@ -62,7 +60,7 @@ app.get("/health", (req, res) => {
   const version = pkg && pkg.version ? pkg.version : "unknown";
   const mem = process.memoryUsage();
   // เช็คสถานะของ database
-  const db = require("./config/database");
+  const db = require("./src/config/database");
   db.getConnection((err, connection) => {
     if (err) {
       console.error("Database connection error:", err);
@@ -94,6 +92,7 @@ app.get("/health", (req, res) => {
 /** --------------------------------------------------------------------
  * จัดการเส้นทางที่ไม่พบ (404) และข้อผิดพลาดที่ไม่ได้จัดการ (500)
  */
+const { errorHandler } = require("./src/api/middleware/error.middleware");
 app
   .use((_, res) => {
     res.status(404).json({ error: "API endpoint not found" });

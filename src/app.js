@@ -1,5 +1,5 @@
 /**
- * /api/routes/index.js
+ * /src/app.js
  *
  * Central Route Registry
  * รวบรวมและ Export Routes ทั้งหมด
@@ -9,8 +9,8 @@ const express = require("express");
 const router = express.Router();
 
 // Import routes
-const companyRoutes = require("./company.routes");
-const departmentRoutes = require("./department.routes");
+const companyRoutes = require("./api/routes/company.routes");
+const departmentRoutes = require("./api/routes/department.routes");
 
 // API Version prefix
 const API_VERSION = "/api";

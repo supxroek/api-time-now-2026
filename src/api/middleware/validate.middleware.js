@@ -1,5 +1,5 @@
 /**
- * /api/middleware/validate.middleware.js
+ * /src/api/middleware/validate.middleware.js
  *
  * Validation Middleware using Joi
  * ตรวจสอบความถูกต้องของ request data
@@ -14,6 +14,7 @@ const Joi = require("joi");
  */
 const validate = (schema, property = "body") => {
   return (req, res, next) => {
+    // ดำเนินการ validate
     const { error, value } = schema.validate(req[property], {
       abortEarly: false, // แสดง error ทั้งหมด ไม่หยุดที่ error แรก
       stripUnknown: true, // ลบ field ที่ไม่ได้กำหนดใน schema
@@ -32,7 +33,7 @@ const validate = (schema, property = "body") => {
       });
     }
 
-    // Replace request data with validated value
+    // แทนที่ข้อมูลเดิมด้วยข้อมูลที่ผ่านการ validate แล้ว
     req[property] = value;
     next();
   };
