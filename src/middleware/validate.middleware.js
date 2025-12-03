@@ -40,6 +40,22 @@ const validate = (schema, property = "body") => {
 };
 
 // ========================================
+// Auth Validation Schemas
+// ========================================
+const authSchemas = {
+  login: Joi.object({
+    email: Joi.string().email().max(255).required(), // อีเมลต้องถูกต้องตามรูปแบบ
+    password: Joi.string().min(6).max(128).required(), // รหัสผ่านอย่างน้อย 6 ตัวอักษร
+  }),
+
+  register: Joi.object({
+    email: Joi.string().email().max(255).required(), // อีเมลต้องถูกต้องตามรูปแบบ
+    password: Joi.string().min(6).max(128).required(), // รหัสผ่านอย่างน้อย 6 ตัวอักษร
+    role: Joi.string().valid("admin", "user").required(), // กำหนดบทบาทผู้ใช้
+  }),
+};
+
+// ========================================
 // Company Validation Schemas
 // ========================================
 
@@ -87,6 +103,7 @@ const departmentSchemas = {
 
 module.exports = {
   validate,
+  authSchemas,
   companySchemas,
   departmentSchemas,
 };

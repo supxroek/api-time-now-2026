@@ -9,8 +9,7 @@ const express = require("express");
 const router = express.Router();
 
 // Import routes
-const companyRoutes = require("./api/routes/company.routes");
-const departmentRoutes = require("./api/routes/department.routes");
+const authRoutes = require("./modules/auth/auth.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -18,8 +17,7 @@ const API_VERSION = "/api";
 /**
  * Mount routes
  */
-router.use(`${API_VERSION}/company`, companyRoutes);
-router.use(`${API_VERSION}/departments`, departmentRoutes);
+router.use(`${API_VERSION}/auth`, authRoutes);
 
 /**
  * API Info route
@@ -30,18 +28,24 @@ router.get(API_VERSION, (req, res) => {
     message: "Time Now API",
     version: "1.0.0",
     endpoints: {
-      company: {
-        "GET /api/company/profile": "ดึงข้อมูลบริษัท",
-        "PUT /api/company/profile": "แก้ไขข้อมูลบริษัท",
-        "GET /api/company/subscription": "ดึงสถานะ Subscription",
+      auth: {
+        "POST /api/auth/login": "เข้าสู่ระบบ",
+        "POST /api/auth/register": "ลงทะเบียนผู้ใช้ใหม่", // อาจจะไม่ได้ใช้
+        "POST /api/auth/refresh-token": "รีเฟรชโทเค็น",
       },
-      departments: {
-        "GET /api/departments": "ดึงรายชื่อแผนกทั้งหมด",
-        "GET /api/departments/:id": "ดึงข้อมูลแผนกตาม ID",
-        "POST /api/departments": "สร้างแผนกใหม่",
-        "PUT /api/departments/:id": "แก้ไขแผนก",
-        "DELETE /api/departments/:id": "ลบแผนก",
-      },
+
+      // company: {
+      //   "GET /api/company/profile": "ดึงข้อมูลบริษัท",
+      //   "PUT /api/company/profile": "แก้ไขข้อมูลบริษัท",
+      //   "GET /api/company/subscription": "ดึงสถานะ Subscription",
+      // },
+      // departments: {
+      //   "GET /api/departments": "ดึงรายชื่อแผนกทั้งหมด",
+      //   "GET /api/departments/:id": "ดึงข้อมูลแผนกตาม ID",
+      //   "POST /api/departments": "สร้างแผนกใหม่",
+      //   "PUT /api/departments/:id": "แก้ไขแผนก",
+      //   "DELETE /api/departments/:id": "ลบแผนก",
+      // },
     },
   });
 });

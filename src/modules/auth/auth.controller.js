@@ -1,0 +1,54 @@
+/**
+ * /src/api/controllers/auth.controller.js
+ *
+ * Auth Controller
+ * จัดการ request/response สำหรับ Auth endpoints
+ */
+
+// import services and helpers
+const authService = require("./auth.service");
+
+// Controller Class
+class AuthController {
+  // POST /api/auth/login
+  async login(req, res) {
+    try {
+      const { email, password } = req.body;
+      const user = await authService.login(email, password);
+
+      // บันทึกการเข้าสู่ระบบ (optional)
+      await authService.recordLogin(user.id);
+
+      // กรองข้อมูลที่จะส่งกลับไปยัง client
+      const { password_hash, ...result } = user; // ลบ password_hash ออก
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // POST /api/auth/register
+  async register(req, res) {
+    try {
+      const { email, password, role } = req.body;
+      const result = await authService.register(email, password, role);
+      res.status(201).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+}
+
+module.exports = new AuthController();

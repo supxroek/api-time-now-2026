@@ -92,7 +92,7 @@ app.get("/health", (req, res) => {
 /** --------------------------------------------------------------------
  * จัดการเส้นทางที่ไม่พบ (404) และข้อผิดพลาดที่ไม่ได้จัดการ (500)
  */
-const { errorHandler } = require("./src/api/middleware/error.middleware");
+const { errorHandler } = require("./src/middleware/error.middleware");
 app
   .use((_, res) => {
     res.status(404).json({ error: "API endpoint not found" });

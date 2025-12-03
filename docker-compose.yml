@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root   # เปลี่ยนรหัสผ่านให้ปลอดภัย
+      MYSQL_DATABASE: mydb                 # ให้สร้าง DB เริ่มต้นชื่อ mydb
+      MYSQL_USER: myuser                   # user เพิ่มเติม
+      MYSQL_PASSWORD: mypassword           # รหัสผ่านของ myuser
+    ports:
+      - "3306:3306"
+    volumes:
+      - C:/Developer/MySQL/mysql-data:/var/lib/mysql       # เก็บ data ถาวรในโฟลเดอร์ข้างนอก
