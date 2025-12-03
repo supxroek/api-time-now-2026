@@ -49,6 +49,23 @@ class AuthController {
       });
     }
   }
+
+  // POST /api/auth/refresh-token
+  async refreshToken(req, res) {
+    try {
+      const { token } = req.body;
+      const newToken = await authService.refreshToken(token);
+      res.json({
+        success: true,
+        data: { token: newToken },
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new AuthController();

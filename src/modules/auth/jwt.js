@@ -17,6 +17,15 @@ class JWT {
   generateToken(payload) {
     return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
   }
+
+  // ตรวจสอบและถอดรหัส JWT token
+  verifyToken(token) {
+    try {
+      return jwt.verify(token, JWT_SECRET);
+    } catch (error) {
+      return null; // ถ้า token ไม่ถูกต้อง ให้คืนค่า null
+    }
+  }
 }
 
 module.exports = new JWT();

@@ -53,6 +53,10 @@ const authSchemas = {
     password: Joi.string().min(6).max(128).required(), // รหัสผ่านอย่างน้อย 6 ตัวอักษร
     role: Joi.string().valid("admin", "user").required(), // กำหนดบทบาทผู้ใช้
   }),
+
+  refreshToken: Joi.object({
+    token: Joi.string().required(), // โทเค็นต้องมีค่า
+  }),
 };
 
 // ========================================

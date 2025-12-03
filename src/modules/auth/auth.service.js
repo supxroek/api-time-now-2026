@@ -47,6 +47,17 @@ class AuthService {
     const newUser = await authModel.createUser(email, password, role);
     return newUser;
   }
+
+  // business logic for refreshing token
+  async refreshToken(oldToken) {
+    // ตรวจสอบและสร้าง token ใหม่
+    const payload = JWT.verifyToken(oldToken);
+    if (!payload) {
+      throw new Error("Invalid token");
+    }
+    const newToken = JWT.generateToken({ id: payload.id, role: payload.role });
+    return newToken;
+  }
 }
 
 module.exports = new AuthService();
