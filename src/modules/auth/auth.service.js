@@ -7,7 +7,11 @@
 
 // import models and utilities
 const authModel = require("./auth.model");
+const duration = require("../../utilities/duration");
 const JWT = require("./jwt");
+
+require("dotenv").config();
+const { JWT_EXPIRES_IN = "1h" } = process.env;
 
 // Service Class
 class AuthService {
@@ -24,7 +28,11 @@ class AuthService {
     }
 
     // สร้าง token
-    const token = JWT.generateToken({ id: user.id, role: user.role });
+    const token = JWT.generateToken({
+      id: user.id,
+      company_id: user.company_id,
+      role: user.role,
+    });
     user.token = token;
 
     return user;
@@ -55,7 +63,13 @@ class AuthService {
     if (!payload) {
       throw new Error("Invalid token");
     }
+    // สร้าง token ใหม่
     const newToken = JWT.generateToken({ id: payload.id, role: payload.role });
+    // คำนวณวันหมดอายุของ token ใหม่
+    const ms = await duration.parseDurationToMs(JWT_EXPIRES_IN);
+    const expiresAt = new Date(Date.now() + ms);
+    // บันทึก refresh token ใหม่ในฐานข้อมูล
+    await authModel.updateRefreshToken(payload.id, newToken, expiresAt);
     return newToken;
   }
 }

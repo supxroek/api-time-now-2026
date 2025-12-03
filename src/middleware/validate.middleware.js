@@ -64,7 +64,12 @@ const authSchemas = {
 // ========================================
 
 const companySchemas = {
-  updateProfile: Joi.object({
+  getCompanies: Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+  }),
+
+  updateCompany: Joi.object({
     name: Joi.string().min(2).max(255),
     branch: Joi.string().max(5).allow("", null),
     email: Joi.string().email().max(255).allow("", null),

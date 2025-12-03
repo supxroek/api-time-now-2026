@@ -1,5 +1,5 @@
 /**
- * /src/api/controllers/auth.controller.js
+ * /src/modules/auth/auth.controller.js
  *
  * Auth Controller
  * จัดการ request/response สำหรับ Auth endpoints
@@ -21,7 +21,7 @@ class AuthController {
 
       // กรองข้อมูลที่จะส่งกลับไปยัง client
       const { password_hash, ...result } = user; // ลบ password_hash ออก
-      res.json({
+      res.status(200).json({
         success: true,
         data: result,
       });

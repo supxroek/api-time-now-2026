@@ -1,5 +1,8 @@
 const pool = require("../../config/database");
 const bcrypt = require("bcrypt");
+require("dotenv").config();
+
+const { JWT_EXPIRES_IN = "1h" } = process.env;
 
 // Model Class
 class AuthModel {
@@ -32,6 +35,15 @@ class AuthModel {
       [email, passwordHash, role]
     );
     return { id: result.insertId, email, role };
+  }
+
+  // อัปเดต refresh token
+  async updateRefreshToken(userId, refreshToken, expiresAt) {
+    // บันทึก refresh token ในฐานข้อมูล
+    await pool.query(
+      "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
+      [userId, refreshToken, expiresAt]
+    );
   }
 }
 

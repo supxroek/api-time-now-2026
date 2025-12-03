@@ -6,8 +6,9 @@
  */
 
 const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * ตรวจสอบ JWT Token
@@ -26,11 +27,12 @@ const authenticate = (req, res, next) => {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // เพิ่มข้อมูล user และ company ใน request
-    req.userId = decoded.userId || decoded.id;
-    req.companyId = decoded.companyId;
-    req.userRole = decoded.role;
-    req.user = decoded;
+    // เพิ่มข้อมูล user และ company ใน request object
+    req.user = {
+      id: decoded.id,
+      company_id: decoded.company_id,
+      role: decoded.role,
+    }; // req.user สำหรับเก็บข้อมูลผู้ใช้ทั้งหมด
 
     next();
   } catch (error) {
