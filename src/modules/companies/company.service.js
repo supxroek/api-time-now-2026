@@ -6,6 +6,7 @@
  */
 
 // import models and utilities
+const pool = require("../../config/database");
 const companyModel = require("./company.model");
 
 // Service Class
@@ -23,16 +24,27 @@ class CompanyService {
 
   // business logic for updating company information
   async updateCompany(companyId, updateData) {
-    // ตรวจสอบ companyId
-    if (!companyId) {
-      throw new Error("Company ID is required");
+    // เริ่ม transaction
+    await pool.beginTransaction();
+    try {
+      // ตรวจสอบ companyId
+      if (!companyId) {
+        throw new Error("Company ID is required");
+      }
+      // อัปเดตข้อมูลบริษัทในฐานข้อมูล
+      const updatedCompany = await companyModel.updateCompany(
+        companyId,
+        updateData
+      );
+      // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
+      await pool.commit();
+      return updatedCompany;
+    } catch (error) {
+      // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
+      await pool.rollback();
+      await pool.release();
+      throw error;
     }
-    // อัปเดตข้อมูลบริษัทในฐานข้อมูล
-    const updatedCompany = await companyModel.updateCompany(
-      companyId,
-      updateData
-    );
-    return updatedCompany;
   }
 }
 

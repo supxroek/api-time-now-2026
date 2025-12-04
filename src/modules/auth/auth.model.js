@@ -1,8 +1,5 @@
 const pool = require("../../config/database");
 const bcrypt = require("bcrypt");
-require("dotenv").config();
-
-const { JWT_EXPIRES_IN = "1h" } = process.env;
 
 // Model Class
 class AuthModel {
