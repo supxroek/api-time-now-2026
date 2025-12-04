@@ -21,13 +21,13 @@ router
   .get(
     "/profile",
     authenticate, // ต้องผ่านการยืนยันตัวตน
-    validate(companySchemas.getCompanies, "query"),
+    validate(companySchemas.get, "query"),
     companyController.getCompanies // ดึงข้อมูลบริษัทของผู้ใช้
   )
   .patch(
     "/profile",
     authenticate, // ต้องผ่านการยืนยันตัวตน
-    validate(companySchemas.updateCompany, "body"),
+    validate(companySchemas.update, "body"),
     companyController.updateCompany // อัปเดตข้อมูลบริษัทของผู้ใช้
   );
 

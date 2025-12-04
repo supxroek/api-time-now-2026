@@ -64,7 +64,11 @@ class AuthService {
       throw new Error("Invalid token");
     }
     // สร้าง token ใหม่
-    const newToken = JWT.generateToken({ id: payload.id, role: payload.role });
+    const newToken = JWT.generateToken({
+      id: payload.id,
+      company_id: payload.company_id,
+      role: payload.role,
+    });
     // คำนวณวันหมดอายุของ token ใหม่
     const ms = await duration.parseDurationToMs(JWT_EXPIRES_IN);
     const expiresAt = new Date(Date.now() + ms);

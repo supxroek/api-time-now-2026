@@ -17,7 +17,7 @@ const authenticate = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
         error: "Access denied. No token provided.",
@@ -98,8 +98,8 @@ const mockAuth = (req, res, next) => {
     });
   }
 
-  req.companyId = parseInt(companyId, 10);
-  req.userId = parseInt(req.headers["x-user-id"] || 1, 10);
+  req.companyId = Number.parseInt(companyId, 10);
+  req.userId = Number.parseInt(req.headers["x-user-id"] || 1, 10);
   req.userRole = req.headers["x-user-role"] || "admin";
   req.user = {
     id: req.userId,

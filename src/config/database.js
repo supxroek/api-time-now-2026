@@ -1,5 +1,5 @@
 const mysql = require("mysql2/promise");
-const fs = require("fs");
+const fs = require("node:fs");
 
 /**
  * /config/database.js
@@ -72,7 +72,7 @@ const createPool = () => {
       user: DB_USER,
       password: DB_PASS,
       database: DB_NAME,
-      connectionLimit: parseInt(DB_CONN_LIMIT),
+      connectionLimit: Number.parseInt(DB_CONN_LIMIT),
       socketPath,
     };
 
@@ -84,11 +84,11 @@ const createPool = () => {
     // การตั้งค่าสำหรับ Development (TCP connection)
     const devConfig = {
       host: DB_HOST,
-      port: DB_PORT ? parseInt(DB_PORT) : 3306,
+      port: DB_PORT ? Number.parseInt(DB_PORT) : 3306,
       user: DB_USER,
       password: DB_PASS,
       database: DB_NAME,
-      connectionLimit: parseInt(DB_CONN_LIMIT),
+      connectionLimit: Number.parseInt(DB_CONN_LIMIT),
       ssl: loadSSLCert(),
     };
 

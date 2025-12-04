@@ -14,7 +14,7 @@ class CompanyController {
   async getCompanies(req, res) {
     // ดึงข้อมูลบริษัทของผู้ใช้จาก req.user.company_id
     try {
-      const companyId = req.user && req.user.company_id;
+      const companyId = req.user?.company_id;
       const company = await companyService.getCompanyById(companyId);
       res.status(200).json({
         success: true,
@@ -32,7 +32,7 @@ class CompanyController {
   async updateCompany(req, res) {
     // อัปเดตข้อมูลบริษัทของผู้ใช้จาก req.user.company_id
     try {
-      const companyId = req.user && req.user.company_id;
+      const companyId = req.user?.company_id;
       const updateData = req.body;
       const updatedCompany = await companyService.updateCompany(
         companyId,

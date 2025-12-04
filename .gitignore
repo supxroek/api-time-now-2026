@@ -16,7 +16,7 @@ lerna-debug.log*
 package-lock.json
 
 #certs
-config/certs/*.pem
+src/config/certs/*.pem
 
 # Runtime / env
 .env

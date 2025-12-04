@@ -28,8 +28,8 @@ const corsOptions =
 
 // ตั้งค่า rate limiting
 const limiter = rateLimit({
-  windowMs: Math.max(1, parseInt(RATE_LIMIT_WINDOW_MS, 10)) * 60 * 1000,
-  max: parseInt(RATE_LIMIT_MAX, 10),
+  windowMs: Math.max(1, Number.parseInt(RATE_LIMIT_WINDOW_MS, 10)) * 60 * 1000,
+  max: Number.parseInt(RATE_LIMIT_MAX, 10),
   standardHeaders: true,
   legacyHeaders: false,
   message: "Too many requests, please try again later.",
@@ -57,7 +57,7 @@ app.use(routes);
 app.get("/health", (req, res) => {
   // ดึงข้อมูล version จาก package.json
   const pkg = require("./package.json");
-  const version = pkg && pkg.version ? pkg.version : "unknown";
+  const version = pkg?.version ? pkg.version : "unknown";
   const mem = process.memoryUsage();
   // เช็คสถานะของ database
   const db = require("./src/config/database");
@@ -70,7 +70,6 @@ app.get("/health", (req, res) => {
       });
     }
     if (connection) connection.release();
-    return;
   });
   // สร้าง response สำหรับ health check
   const healthCheck = {
@@ -114,7 +113,7 @@ server.on("listening", () => {
 });
 // จัดการข้อผิดพลาดของเซิร์ฟเวอร์
 server.on("error", (err) => {
-  if (err && err.code === "EADDRINUSE") {
+  if (err?.code === "EADDRINUSE") {
     console.error(`❌ Port ${PORT} is already in use`);
     console.error(
       `→ To fix: stop the process using the port or run with a different PORT (e.g. PORT=3001)`
@@ -131,7 +130,7 @@ server.on("error", (err) => {
  */
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled Rejection:", reason);
-  if (server && server.close) {
+  if (server?.close) {
     server.close(() => process.exit(1));
   } else {
     process.exit(1);
@@ -139,7 +138,7 @@ process.on("unhandledRejection", (reason) => {
 });
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
-  if (server && server.close) {
+  if (server?.close) {
     server.close(() => process.exit(1));
   } else {
     process.exit(1);

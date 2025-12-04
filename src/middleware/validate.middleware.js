@@ -23,7 +23,7 @@ const validate = (schema, property = "body") => {
     if (error) {
       const errors = error.details.map((detail) => ({
         field: detail.path.join("."),
-        message: detail.message.replace(/"/g, ""),
+        message: detail.message.replaceAll('"', ""),
       }));
 
       return res.status(400).json({
@@ -64,12 +64,12 @@ const authSchemas = {
 // ========================================
 
 const companySchemas = {
-  getCompanies: Joi.object({
+  get: Joi.object({
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(10),
   }),
 
-  updateCompany: Joi.object({
+  update: Joi.object({
     name: Joi.string().min(2).max(255),
     branch: Joi.string().max(5).allow("", null),
     email: Joi.string().email().max(255).allow("", null),
@@ -91,11 +91,20 @@ const companySchemas = {
 // ========================================
 
 const departmentSchemas = {
+  get: Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+  }),
+
   create: Joi.object({
     departmentName: Joi.string().min(2).max(255).required(),
     headDep_email: Joi.string().email().max(255).allow("", null),
     headDep_name: Joi.string().max(255).allow("", null),
     headDep_tel: Joi.string().max(255).allow("", null),
+  }),
+
+  getById: Joi.object({
+    id: Joi.number().integer().positive().required(),
   }),
 
   update: Joi.object({
@@ -105,7 +114,7 @@ const departmentSchemas = {
     headDep_tel: Joi.string().max(255).allow("", null),
   }).min(1),
 
-  idParam: Joi.object({
+  delete: Joi.object({
     id: Joi.number().integer().positive().required(),
   }),
 };

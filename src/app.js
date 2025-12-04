@@ -11,6 +11,7 @@ const router = express.Router();
 // Import routes
 const authRoutes = require("./modules/auth/auth.routes");
 const companyRoutes = require("./modules/companies/company.routes");
+const departmentRoutes = require("./modules/departments/department.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -20,6 +21,7 @@ const API_VERSION = "/api";
  */
 router.use(`${API_VERSION}/auth`, authRoutes);
 router.use(`${API_VERSION}/company`, companyRoutes);
+router.use(`${API_VERSION}/departments`, departmentRoutes);
 
 /**
  * API Info route
