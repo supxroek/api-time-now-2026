@@ -8,7 +8,7 @@
 // import models and utilities
 const authModel = require("./auth.model");
 const duration = require("../../utilities/duration");
-const JWT = require("./jwt");
+const JWT = require("./handleToken");
 
 require("dotenv").config();
 const { JWT_EXPIRES_IN = "1h" } = process.env;
