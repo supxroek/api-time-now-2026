@@ -24,7 +24,8 @@ class DepartmentService {
   // สร้างแผนกใหม่สำหรับบริษัทที่ระบุ
   async createDepartment(companyId, departmentData) {
     // เริ่ม transaction
-    await pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // ตรวจสอบ companyId
       if (!companyId || !departmentData) {
@@ -44,13 +45,13 @@ class DepartmentService {
       }
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
       // สร้างแผนกใหม่
       return await DepartmentModel.create(companyId, departmentData);
     } catch (error) {
       // rollback transaction - กรณีล้มเหลว: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }
@@ -67,7 +68,8 @@ class DepartmentService {
   // อัปเดตข้อมูลแผนกตาม ID สำหรับบริษัทที่ระบุ
   async updateDepartment(companyId, departmentId, updateData) {
     // เริ่ม transaction
-    await pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // ตรวจสอบ companyId
       if (!companyId) {
@@ -89,7 +91,7 @@ class DepartmentService {
       }
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
       // อัปเดตแผนก
       return await DepartmentModel.updateByIdAndCompanyId(
         departmentId,
@@ -98,8 +100,8 @@ class DepartmentService {
       );
     } catch (error) {
       // rollback transaction - กรณีล้มเหลว: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }
@@ -107,7 +109,8 @@ class DepartmentService {
   // ลบแผนกตาม ID สำหรับบริษัทที่ระบุ
   async deleteDepartment(companyId, departmentId) {
     // เริ่ม transaction
-    await pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // ตรวจสอบ companyId
       if (!companyId) {
@@ -123,7 +126,7 @@ class DepartmentService {
       }
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
       // ลบแผนก
       return await DepartmentModel.deleteByIdAndCompanyId(
         departmentId,
@@ -131,8 +134,8 @@ class DepartmentService {
       );
     } catch (error) {
       // rollback transaction - กรณีล้มเหลว: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }

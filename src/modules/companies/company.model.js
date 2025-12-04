@@ -2,7 +2,7 @@ const pool = require("../../config/database");
 
 // Model Class
 class CompanyModel {
-  // ดึงข้อมูลบริษัทจากฐานข้อมูลตามเงื่อนไข
+  // ดึงข้อมูลบริษัทของผู้ใช้
   async findCompanyById(companyId) {
     const query = "SELECT * FROM companies WHERE id = ?";
     const [rows] = await pool.execute(query, [companyId]);

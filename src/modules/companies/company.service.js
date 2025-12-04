@@ -25,7 +25,8 @@ class CompanyService {
   // business logic for updating company information
   async updateCompany(companyId, updateData) {
     // เริ่ม transaction
-    await pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // ตรวจสอบ companyId
       if (!companyId) {
@@ -37,12 +38,12 @@ class CompanyService {
         updateData
       );
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
       return updatedCompany;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }

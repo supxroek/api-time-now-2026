@@ -19,7 +19,8 @@ class AuthService {
   // business logic for user login
   async login(email, password) {
     // เริ่ม transaction
-    pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // ตรวจสอบผู้ใช้และรหัสผ่าน
       const user = await authModel.findUserByEmail(email);
@@ -39,12 +40,12 @@ class AuthService {
       });
       user.token = token;
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
       return user;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }
@@ -52,16 +53,17 @@ class AuthService {
   // บันทึกการเข้าสู่ระบบ (optional)
   async recordLogin(userId) {
     // เริ่ม transaction
-    pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // อัปเดต last_login ในฐานข้อมูล
       await authModel.updateLastLogin(userId);
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }
@@ -69,7 +71,8 @@ class AuthService {
   // business logic for user registration
   async register(email, password, role) {
     // เริ่ม transaction
-    pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // ตรวจสอบว่าผู้ใช้มีอยู่แล้วหรือไม่
       const existingUser = await authModel.findUserByEmail(email);
@@ -79,12 +82,12 @@ class AuthService {
       // เพิ่มผู้ใช้ใหม่
       const newUser = await authModel.createUser(email, password, role);
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
       return newUser;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }
@@ -92,7 +95,8 @@ class AuthService {
   // business logic for refreshing token
   async refreshToken(oldToken) {
     // เริ่ม transaction
-    await pool.beginTransaction();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     try {
       // ตรวจสอบและสร้าง token ใหม่
       const payload = JWT.verifyToken(oldToken);
@@ -111,12 +115,12 @@ class AuthService {
       // บันทึก refresh token ใหม่ในฐานข้อมูล
       await authModel.updateRefreshToken(payload.id, newToken, expiresAt);
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await pool.commit();
+      await connection.commit();
       return newToken;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await pool.rollback();
-      await pool.release();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }
