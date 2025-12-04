@@ -31,6 +31,11 @@ class Duration {
     }
     return totalMs;
   }
+
+  // แปลงวันที่เป็น ISO string เป็นวัตถุ Date
+  async parseISOToDate(isoStr) {
+    return new Date(isoStr);
+  }
 }
 
 module.exports = new Duration();

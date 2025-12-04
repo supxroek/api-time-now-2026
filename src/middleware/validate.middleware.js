@@ -119,9 +119,82 @@ const departmentSchemas = {
   }),
 };
 
+// ========================================
+// Employee Validation Schemas
+// ========================================
+const employeeSchemas = {
+  get: Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+    companyId: Joi.number().integer().positive().optional(),
+    departmentId: Joi.number().integer().positive().optional(),
+    q: Joi.string().max(255).allow("", null).optional(), // search query
+  }),
+
+  create: Joi.object({
+    name: Joi.string().min(2).max(255).required(),
+    ID_or_Passport_Number: Joi.string()
+      .pattern(/^\d{1,13}$/)
+      .max(13)
+      .allow("", null),
+    companyId: Joi.number().integer().positive().required(),
+    lineUserId: Joi.string().max(255).allow("", null),
+    start_date: Joi.date().iso().allow("", null),
+    departmentId: Joi.number().integer().positive().allow(null),
+    dayOff: Joi.string().max(255).allow("", null),
+    resign_date: Joi.date().iso().allow("", null),
+  }),
+
+  getEmployeeById: Joi.object({
+    id: Joi.number().integer().positive().required(),
+  }),
+
+  update: Joi.object({
+    name: Joi.string().min(2).max(255),
+    ID_or_Passport_Number: Joi.string()
+      .pattern(/^\d{1,13}$/)
+      .max(13)
+      .allow("", null),
+    companyId: Joi.number().integer().positive(),
+    lineUserId: Joi.string().max(255).allow("", null),
+    start_date: Joi.date().iso().allow("", null),
+    departmentId: Joi.number().integer().positive().allow(null),
+    dayOff: Joi.string().max(255).allow("", null),
+    resign_date: Joi.date().iso().allow("", null),
+  }).min(1),
+
+  resign: Joi.object({
+    resign_date: Joi.alternatives()
+      .try(
+        Joi.date().iso(),
+        Joi.string()
+          .pattern(/^\d{1,2}\/\d{1,2}\/\d{4}$/)
+          .custom((value, helpers) => {
+            // parse dd/MM/yyyy and convert Buddhist year (if present) to Gregorian
+            const parts = value.split("/").map((p) => Number.parseInt(p, 10));
+            const [d, m, y] = parts;
+            if (!d || !m || !y) return helpers.error("any.invalid");
+            let year = y;
+            // if year looks like Thai Buddhist year (>= 2400), convert to AD
+            if (year >= 2400) {
+              year = year - 543;
+            }
+            const iso = `${year.toString().padStart(4, "0")}-${String(
+              m
+            ).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+            const dt = new Date(iso);
+            if (Number.isNaN(dt.getTime())) return helpers.error("any.invalid");
+            return dt;
+          })
+      )
+      .required(),
+  }),
+};
+
 module.exports = {
   validate,
   authSchemas,
   companySchemas,
   departmentSchemas,
+  employeeSchemas,
 };

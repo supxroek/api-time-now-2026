@@ -19,33 +19,34 @@ const {
 // กำหนดเส้นทาง API ที่นี้
 router
   .get(
-    "/departments", //สำหรับดึงข้อมูลแผนกทั้งหมด พร้อมจำนวนพนักงานในแต่ละแผนก
+    "/", //สำหรับดึงข้อมูลแผนกทั้งหมด พร้อมจำนวนพนักงานในแต่ละแผนก
     authenticate, // ต้องผ่านการยืนยันตัวตน
     validate(departmentSchemas.get),
     DepartmentController.getDepartments
   )
   .post(
-    "/departments", //สำหรับสร้างแผนกใหม่
+    "/", //สำหรับสร้างแผนกใหม่
     authenticate, // ต้องผ่านการยืนยันตัวตน
     validate(departmentSchemas.create, "body"),
     DepartmentController.createDepartment
   )
   .get(
-    "/departments/:id", //สำหรับดึงข้อมูลแผนกตาม ID
+    "/:id", //สำหรับดึงข้อมูลแผนกตาม ID
     authenticate, // ต้องผ่านการยืนยันตัวตน
     validate(departmentSchemas.getById, "params"),
     DepartmentController.getDepartmentById
   )
   .patch(
-    "/departments/:id", //สำหรับอัปเดตข้อมูลแผนกตาม ID
+    "/:id", //สำหรับอัปเดตข้อมูลแผนกตาม ID
     authenticate, // ต้องผ่านการยืนยันตัวตน
     validate(departmentSchemas.update, "body"),
     DepartmentController.updateDepartment
   )
   .delete(
-    "/departments/:id", //สำหรับลบแผนกตาม ID
+    "/:id", //สำหรับลบแผนกตาม ID
     authenticate, // ต้องผ่านการยืนยันตัวตน
     validate(departmentSchemas.delete, "params"),
     DepartmentController.deleteDepartment
   );
+
 module.exports = router;
