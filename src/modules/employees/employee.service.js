@@ -203,7 +203,7 @@ class EmployeeService {
       return data.map((emp, idx) => ({
         __inputIndex: idx,
         ...defaultEmployeeData,
-        ...(emp || {}),
+        ...(emp ?? {}),
       }));
     };
 
