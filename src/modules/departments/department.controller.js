@@ -1,8 +1,8 @@
 /**
- * /src/modules/organization/org.controller.js
+ * /src/modules/departments/department.controller.js
  *
- * Organization Controller
- * ชั้นควบคุมสำหรับการจัดการคำขอที่เกี่ยวกับองค์กร
+ * departments Controller
+ * ชั้นควบคุมสำหรับการจัดการคำขอที่เกี่ยวกับแผนก
  */
 
 // import services and helpers

@@ -21,7 +21,7 @@ const API_VERSION = "/api";
  */
 router.use(`${API_VERSION}/auth`, authRoutes);
 router.use(`${API_VERSION}/company`, companyRoutes);
-router.use(`${API_VERSION}/departments`, departmentRoutes);
+router.use(`${API_VERSION}/organization`, departmentRoutes);
 
 /**
  * API Info route

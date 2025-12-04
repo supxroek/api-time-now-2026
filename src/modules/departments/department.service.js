@@ -1,8 +1,8 @@
 /**
- * /src/modules/organization/org.service.js
+ * /src/modules/departments/department.service.js
  *
- * Organization Service
- * ชั้นบริการสำหรับการจัดการข้อมูลองค์กร
+ * Departments Service
+ * ชั้นบริการสำหรับการจัดการข้อมูลแผนก
  */
 
 // import models and helpers
@@ -23,9 +23,25 @@ class DepartmentService {
   // สร้างแผนกใหม่สำหรับบริษัทที่ระบุ
   async createDepartment(companyId, departmentData) {
     // ตรวจสอบ companyId
-    if (!companyId) {
-      throw new Error("companyId is required");
+    if (!companyId || !departmentData) {
+      throw new Error("companyId and departmentData are required");
     }
+
+    // ตรวจสอบชื่อแผนกไม่ให้ซ้ำกันภายในบริษัท
+    const existingDepartments = await DepartmentModel.findAllByCompanyId(
+      companyId
+    );
+
+    const isDuplicate = existingDepartments.some(
+      (dept) => dept.departmentName === departmentData.departmentName
+    );
+    if (isDuplicate) {
+      throw new Error(
+        `Department name:${departmentData.departmentName} already exists within the company`
+      );
+    }
+
+    // สร้างแผนกใหม่
     return await DepartmentModel.create(companyId, departmentData);
   }
 
@@ -44,6 +60,23 @@ class DepartmentService {
     if (!companyId) {
       throw new Error("companyId is required");
     }
+
+    // ป้องกันชื่อแผนกซ้ำกันเมื่ออัปเดต
+    const existingDepartments = await DepartmentModel.findAllByCompanyId(
+      companyId
+    );
+    const isDuplicate = existingDepartments.some(
+      (dept) =>
+        dept.departmentName === updateData.departmentName &&
+        dept.id !== departmentId
+    );
+    if (isDuplicate) {
+      throw new Error(
+        `Department name:${updateData.departmentName} already exists within the company`
+      );
+    }
+
+    // อัปเดตแผนก
     return await DepartmentModel.updateByIdAndCompanyId(
       departmentId,
       companyId,
@@ -57,6 +90,17 @@ class DepartmentService {
     if (!companyId) {
       throw new Error("companyId is required");
     }
+
+    // ตรวจสอบว่ามีแผนกดังกล่าวอยู่หรือไม่
+    const department = await DepartmentModel.findByIdAndCompanyId(
+      departmentId,
+      companyId
+    );
+    if (!department) {
+      throw new Error("Department not found");
+    }
+
+    // ลบแผนก
     return await DepartmentModel.deleteByIdAndCompanyId(
       departmentId,
       companyId

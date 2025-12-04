@@ -1,8 +1,8 @@
 /**
- * /src/modules/organization/org.routes.js
+ * /src/modules/departments/department.routes.js
  *
- * Organization Routes
- * กำหนดเส้นทาง API สำหรับการจัดการองค์กร
+ * Departments Routes
+ * กำหนดเส้นทาง API สำหรับการจัดการแผนก
  */
 
 const express = require("express");
@@ -19,33 +19,33 @@ const {
 // กำหนดเส้นทาง API ที่นี้
 router
   .get(
-    "/",
+    "/departments", //สำหรับดึงข้อมูลแผนกทั้งหมด พร้อมจำนวนพนักงานในแต่ละแผนก
     authenticate, // ต้องผ่านการยืนยันตัวตน
     validate(departmentSchemas.get),
     DepartmentController.getDepartments
   )
   .post(
-    "/",
+    "/departments", //สำหรับสร้างแผนกใหม่
     authenticate, // ต้องผ่านการยืนยันตัวตน
-    validate(departmentSchemas.create),
+    validate(departmentSchemas.create, "body"),
     DepartmentController.createDepartment
   )
   .get(
-    "/:id",
+    "/departments/:id", //สำหรับดึงข้อมูลแผนกตาม ID
     authenticate, // ต้องผ่านการยืนยันตัวตน
-    validate(departmentSchemas.getById),
+    validate(departmentSchemas.getById, "params"),
     DepartmentController.getDepartmentById
   )
-  .put(
-    "/:id",
+  .patch(
+    "/departments/:id", //สำหรับอัปเดตข้อมูลแผนกตาม ID
     authenticate, // ต้องผ่านการยืนยันตัวตน
-    validate(departmentSchemas.update),
+    validate(departmentSchemas.update, "body"),
     DepartmentController.updateDepartment
   )
   .delete(
-    "/:id",
+    "/departments/:id", //สำหรับลบแผนกตาม ID
     authenticate, // ต้องผ่านการยืนยันตัวตน
-    validate(departmentSchemas.delete),
+    validate(departmentSchemas.delete, "params"),
     DepartmentController.deleteDepartment
   );
 module.exports = router;

@@ -2,9 +2,10 @@ const pool = require("../../config/database");
 
 // Model Class
 class DepartmentModel {
-  // ดึงรายการแผนกทั้งหมดสำหรับบริษัทที่ระบุ
+  // ดึงรายการแผนกทั้งหมดสำหรับบริษัทที่ระบุ พร้อมจำนวนพนักงานในแต่ละแผนก
   async findAllByCompanyId(companyId) {
-    const query = "SELECT * FROM department WHERE companyId = ?";
+    const query =
+      "SELECT d.*, COUNT(e.id) AS employeeCount FROM department d LEFT JOIN employees e ON d.id = e.departmentId WHERE d.companyId = ? GROUP BY d.id";
     const [rows] = await pool.execute(query, [companyId]);
     return rows;
   }
@@ -30,16 +31,19 @@ class DepartmentModel {
     return rows[0];
   }
 
-  // อัปเดตข้อมูลแผนกตาม ID สำหรับบริษัทที่ระบุ
+  // อัปเดตข้อมูลแผนกตาม ID สำหรับบริษัทที่ระบุ โดยใช้ PATCH
   async updateByIdAndCompanyId(departmentId, companyId, updateData) {
-    const query =
-      "UPDATE department SET name = ?, description = ? WHERE id = ? AND companyId = ?";
-    await pool.execute(query, [
-      updateData.name,
-      updateData.description,
-      departmentId,
-      companyId,
-    ]);
+    const fields = [];
+    const values = [];
+    for (const key in updateData) {
+      fields.push(`${key} = ?`);
+      values.push(updateData[key]);
+    }
+    const query = `UPDATE department SET ${fields.join(
+      ", "
+    )} WHERE id = ? AND companyId = ?`;
+    values.push(departmentId, companyId);
+    await pool.execute(query, values);
     return { id: departmentId, ...updateData };
   }
 
