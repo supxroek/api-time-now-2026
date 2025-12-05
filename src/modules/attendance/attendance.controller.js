@@ -22,7 +22,6 @@ class AttendanceController {
       if (!employeeId) {
         return res.status(401).json({
           success: false,
-          error: "UNAUTHORIZED",
           message: "ไม่พบข้อมูลพนักงาน กรุณาเข้าสู่ระบบใหม่",
         });
       }
@@ -56,7 +55,6 @@ class AttendanceController {
       if (!employeeId) {
         return res.status(401).json({
           success: false,
-          error: "UNAUTHORIZED",
           message: "ไม่พบข้อมูลพนักงาน กรุณาเข้าสู่ระบบใหม่",
         });
       }
@@ -92,7 +90,6 @@ class AttendanceController {
       if (!employeeId) {
         return res.status(401).json({
           success: false,
-          error: "UNAUTHORIZED",
           message: "ไม่พบข้อมูลพนักงาน กรุณาเข้าสู่ระบบใหม่",
         });
       }
@@ -120,7 +117,6 @@ class AttendanceController {
       if (!employeeId) {
         return res.status(401).json({
           success: false,
-          error: "UNAUTHORIZED",
           message: "ไม่พบข้อมูลพนักงาน กรุณาเข้าสู่ระบบใหม่",
         });
       }
@@ -150,7 +146,6 @@ class AttendanceController {
       if (!employeeId) {
         return res.status(401).json({
           success: false,
-          error: "UNAUTHORIZED",
           message: "ไม่พบข้อมูลพนักงาน กรุณาเข้าสู่ระบบใหม่",
         });
       }
@@ -177,7 +172,6 @@ class AttendanceController {
       if (!employeeId) {
         return res.status(401).json({
           success: false,
-          error: "UNAUTHORIZED",
           message: "ไม่พบข้อมูลพนักงาน กรุณาเข้าสู่ระบบใหม่",
         });
       }
@@ -215,7 +209,6 @@ class AttendanceController {
       if (!employeeId) {
         return res.status(401).json({
           success: false,
-          error: "UNAUTHORIZED",
           message: "ไม่พบข้อมูลพนักงาน กรุณาเข้าสู่ระบบใหม่",
         });
       }

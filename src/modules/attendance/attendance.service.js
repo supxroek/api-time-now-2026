@@ -68,7 +68,7 @@ class AttendanceService {
       const currentTime = this._getCurrentTime();
 
       // 1. ตรวจสอบว่า Check-in ไปแล้วหรือยัง
-      const existingRecord = AttendanceModel.findTodayRecord(
+      const existingRecord = await AttendanceModel.findTodayRecord(
         employeeId,
         currentDate
       );
@@ -78,13 +78,13 @@ class AttendanceService {
       }
 
       // 2. ดึงข้อมูลพนักงานเพื่อหา companyId
-      const employee = AttendanceModel.getEmployeeById(employeeId);
+      const employee = await AttendanceModel.getEmployeeById(employeeId);
       if (!employee) {
         throw new Error("ไม่พบข้อมูลพนักงาน");
       }
 
       // 3. หากะงาน (Shift) ของวันนี้
-      const shift = AttendanceModel.findActiveShift(
+      const shift = await AttendanceModel.findActiveShift(
         employeeId,
         currentDate,
         employee.companyId
@@ -155,7 +155,7 @@ class AttendanceService {
       const currentTime = this._getCurrentTime();
 
       // 1. หา Record ที่ยังไม่ได้ Check-out
-      const openRecord = AttendanceModel.findOpenRecord(
+      const openRecord = await AttendanceModel.findOpenRecord(
         employeeId,
         currentDate
       );
@@ -190,7 +190,7 @@ class AttendanceService {
       const isPotentialOT = otMinutes >= OT_THRESHOLD_MINUTES;
 
       // 6. บันทึกข้อมูล
-      const result = AttendanceModel.saveCheckOut(openRecord.id, {
+      const result = await AttendanceModel.saveCheckOut(openRecord.id, {
         endTime: currentTime,
         earlyLeaveStatus: isEarlyLeave ? 1 : 0,
         earlyLeaveMinutes: isEarlyLeave ? earlyLeaveMinutes : 0,
@@ -254,14 +254,14 @@ class AttendanceService {
       const currentTime = this._getCurrentTime();
 
       // 1. หา Record ที่พร้อมเริ่มพัก
-      const record = AttendanceModel.findRecordReadyForBreak(
+      const record = await AttendanceModel.findRecordReadyForBreak(
         employeeId,
         currentDate
       );
 
       if (!record) {
         // ตรวจสอบว่ากำลังพักอยู่หรือไม่
-        const onBreakRecord = AttendanceModel.findRecordOnBreak(
+        const onBreakRecord = await AttendanceModel.findRecordOnBreak(
           employeeId,
           currentDate
         );
@@ -276,7 +276,10 @@ class AttendanceService {
       }
 
       // 2. บันทึกเวลาเริ่มพัก
-      const result = AttendanceModel.saveBreakStart(record.id, currentTime);
+      const result = await AttendanceModel.saveBreakStart(
+        record.id,
+        currentTime
+      );
 
       // 3. ตรวจสอบว่าบันทึกสำเร็จหรือไม่
       if (!result) {
@@ -313,7 +316,10 @@ class AttendanceService {
       const currentTime = this._getCurrentTime();
 
       // 1. หา Record ที่กำลังพักอยู่
-      const record = AttendanceModel.findRecordOnBreak(employeeId, currentDate);
+      const record = await AttendanceModel.findRecordOnBreak(
+        employeeId,
+        currentDate
+      );
 
       if (!record) {
         throw new Error("ไม่พบข้อมูลการพัก หรือคุณยังไม่ได้เริ่มพัก");
@@ -329,7 +335,7 @@ class AttendanceService {
       const isOverBreak = breakDurationMinutes > allowedBreakMinutes;
 
       // 4. บันทึกเวลาสิ้นสุดการพัก
-      const result = AttendanceModel.saveBreakEnd(record.id, {
+      const result = await AttendanceModel.saveBreakEnd(record.id, {
         breakEndTime: currentTime,
         breakDurationMinutes,
         isOverBreak,
@@ -373,7 +379,10 @@ class AttendanceService {
    */
   async getTodayAttendance(employeeId) {
     const currentDate = this._getCurrentDate();
-    const record = AttendanceModel.getTodayAttendance(employeeId, currentDate);
+    const record = await AttendanceModel.getTodayAttendance(
+      employeeId,
+      currentDate
+    );
 
     // กำหนดสถานะตาม conditions
     let state = ATTENDANCE_STATE.READY_TO_CHECK_IN;
@@ -422,7 +431,10 @@ class AttendanceService {
    * ดึงประวัติการบันทึกเวลางาน
    */
   async getAttendanceHistory(employeeId, options = {}) {
-    const result = AttendanceModel.getAttendanceHistory(employeeId, options);
+    const result = await AttendanceModel.getAttendanceHistory(
+      employeeId,
+      options
+    );
 
     // แปลงข้อมูลให้อ่านง่ายขึ้น
     const formattedRecords = result.records.map((record) => ({
@@ -458,7 +470,7 @@ class AttendanceService {
     const month = options.month ? options.month : now.month() + 1; // เช็คว่า options.month มีค่าหรือไม่ (ถ้าไม่มีใช้เดือนปัจจุบัน)
     const year = options.year ? options.year : now.year();
 
-    const summary = AttendanceModel.getAttendanceSummary(
+    const summary = await AttendanceModel.getAttendanceSummary(
       employeeId,
       month,
       year
