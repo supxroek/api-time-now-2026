@@ -31,25 +31,25 @@ const ATTENDANCE_STATE = {
 class AttendanceService {
   // ==================== Helper Methods ====================
 
-  // Helper Methods: แปลงเวลา HH:mm:ss เป็น minutes จากเที่ยงคืน
+  /**
+   * แปลงเวลา HH:mm:ss เป็น minutes จากเที่ยงคืน
+   */
   _timeToMinutes(timeStr) {
     if (!timeStr) return 0;
     const [hours, minutes] = timeStr.split(":").map(Number);
     return hours * 60 + minutes;
   }
 
-  // Helper Methods: คำนวณความต่างของเวลาเป็นนาที
-  // ความต่างเป็นนาที (time1 - time2)
-  _calculateTimeDiffMinutes(time1, time2) {
-    return this._timeToMinutes(time1) - this._timeToMinutes(time2);
-  }
-
-  // Helper Methods: ดึงเวลาปัจจุบันในรูปแบบ HH:mm:ss
+  /**
+   * ดึงเวลาปัจจุบันในรูปแบบ HH:mm:ss
+   */
   _getCurrentTime() {
     return DateUtil.now().format("HH:mm:ss");
   }
 
-  // Helper Methods: ดึงวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
+  /**
+   * ดึงวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
+   */
   _getCurrentDate() {
     return DateUtil.now().format("YYYY-MM-DD");
   }
@@ -58,8 +58,10 @@ class AttendanceService {
 
   /**
    * บันทึกเวลาเข้างาน (Check-in)
+   * @param {number} employeeId - รหัสพนักงาน
+   * @returns {Promise<Object>} ผลลัพธ์การบันทึกเวลา
    */
-  async checkIn(employeeId, checkInData) {
+  async checkIn(employeeId) {
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
@@ -94,10 +96,10 @@ class AttendanceService {
         throw new Error("ไม่พบกะงานสำหรับวันนี้");
       }
 
-      // 4. คำนวณสถานะ Late
+      // 4. คำนวณสถานะ Late (ใช้ free_time จาก workingTime เป็น grace period)
       const shiftStartMinutes = this._timeToMinutes(shift.start_time);
       const currentMinutes = this._timeToMinutes(currentTime);
-      const gracePeriod = shift.grace_period || GRACE_PERIOD_MINUTES;
+      const gracePeriod = Number(shift.free_time ?? GRACE_PERIOD_MINUTES);
 
       const lateMinutes = Math.max(
         0,
@@ -106,15 +108,11 @@ class AttendanceService {
       const isLate = lateMinutes > 0;
 
       // 5. บันทึกข้อมูล
-      const result = AttendanceModel.saveCheckIn({
+      const result = await AttendanceModel.saveCheckIn({
         employeeId,
         companyId: employee.companyId,
         workingTimeId: shift.id,
         startTime: currentTime,
-        lateStatus: isLate ? 1 : 0,
-        lateMinutes: isLate ? lateMinutes : 0,
-        checkInLocation: checkInData.location || null,
-        checkInNote: checkInData.note || null,
       });
 
       await connection.commit();
@@ -130,7 +128,7 @@ class AttendanceService {
           shiftStartTime: shift.start_time,
           isLate,
           lateMinutes: isLate ? lateMinutes : 0,
-          shiftName: shift.name || "กะปกติ",
+          shiftName: shift.shift_name || "กะปกติ",
         },
       };
     } catch (error) {
@@ -145,8 +143,10 @@ class AttendanceService {
 
   /**
    * บันทึกเวลาออกงาน (Check-out)
+   * @param {number} employeeId - รหัสพนักงาน
+   * @returns {Promise<Object>} ผลลัพธ์การบันทึกเวลา
    */
-  async checkOut(employeeId, checkOutData) {
+  async checkOut(employeeId) {
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
@@ -181,8 +181,13 @@ class AttendanceService {
       let totalWorkMinutes = currentMinutes - startMinutes;
 
       // หักเวลาพัก (ถ้ามี)
-      if (openRecord.break_duration_minutes) {
-        totalWorkMinutes -= openRecord.break_duration_minutes;
+      if (openRecord.break_start_time && openRecord.break_end_time) {
+        const breakStartMinutes = this._timeToMinutes(
+          openRecord.break_start_time
+        );
+        const breakEndMinutes = this._timeToMinutes(openRecord.break_end_time);
+        const breakDuration = breakEndMinutes - breakStartMinutes;
+        totalWorkMinutes -= breakDuration;
       }
 
       // 5. คำนวณ OT (ถ้าทำงานเกินเวลาเลิกงาน)
@@ -192,29 +197,20 @@ class AttendanceService {
       // 6. บันทึกข้อมูล
       const result = await AttendanceModel.saveCheckOut(openRecord.id, {
         endTime: currentTime,
-        earlyLeaveStatus: isEarlyLeave ? 1 : 0,
-        earlyLeaveMinutes: isEarlyLeave ? earlyLeaveMinutes : 0,
-        totalWorkMinutes: Math.max(0, totalWorkMinutes),
-        isPotentialOT,
-        otMinutes: isPotentialOT ? otMinutes : 0,
-        checkOutLocation: checkOutData.location || null,
-        checkOutNote: checkOutData.note || null,
       });
 
-      // 7. ตรวจสอบว่าบันทึกสำเร็จหรือไม่
       if (!result) {
         throw new Error("ไม่สามารถบันทึกเวลาออกงานได้");
       }
 
       await connection.commit();
 
-      let message;
+      // กำหนดข้อความตอบกลับ
+      let message = "ออกงานสำเร็จ";
       if (isEarlyLeave) {
         message = `ออกงานสำเร็จ (ออกก่อนเวลา ${earlyLeaveMinutes} นาที)`;
       } else if (isPotentialOT) {
         message = `ออกงานสำเร็จ (มี OT ${otMinutes} นาที รอการอนุมัติ)`;
-      } else {
-        message = "ออกงานสำเร็จ";
       }
 
       return {
@@ -244,8 +240,10 @@ class AttendanceService {
 
   /**
    * บันทึกเวลาเริ่มพัก
+   * @param {number} employeeId - รหัสพนักงาน
+   * @returns {Promise<Object>} ผลลัพธ์การบันทึกเวลา
    */
-  async breakStart(employeeId, breakData) {
+  async breakStart(employeeId) {
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
@@ -281,7 +279,6 @@ class AttendanceService {
         currentTime
       );
 
-      // 3. ตรวจสอบว่าบันทึกสำเร็จหรือไม่
       if (!result) {
         throw new Error("ไม่สามารถบันทึกเวลาเริ่มพักได้");
       }
@@ -306,8 +303,10 @@ class AttendanceService {
 
   /**
    * บันทึกเวลาสิ้นสุดการพัก
+   * @param {number} employeeId - รหัสพนักงาน
+   * @returns {Promise<Object>} ผลลัพธ์การบันทึกเวลา
    */
-  async breakEnd(employeeId, breakData) {
+  async breakEnd(employeeId) {
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
@@ -331,17 +330,14 @@ class AttendanceService {
       const breakDurationMinutes = currentMinutes - breakStartMinutes;
 
       // 3. ตรวจสอบว่าพักเกินเวลาที่อนุญาตหรือไม่
-      const allowedBreakMinutes = Number(record.allowed_break_minutes ?? 60); // default 60 นาที
+      const allowedBreakMinutes = Number(record.allowed_break_minutes ?? 60);
       const isOverBreak = breakDurationMinutes > allowedBreakMinutes;
 
       // 4. บันทึกเวลาสิ้นสุดการพัก
       const result = await AttendanceModel.saveBreakEnd(record.id, {
         breakEndTime: currentTime,
-        breakDurationMinutes,
-        isOverBreak,
       });
 
-      // 5. ตรวจสอบว่าบันทึกสำเร็จหรือไม่
       if (!result) {
         throw new Error("ไม่สามารถบันทึกเวลาสิ้นสุดการพักได้");
       }
@@ -375,6 +371,47 @@ class AttendanceService {
   // ==================== Query Methods ====================
 
   /**
+   * Helper: คำนวณ Late status จาก record
+   */
+  _calculateLateStatus(record) {
+    if (!record?.start_time || !record?.shift_start_time) {
+      return { isLate: false, lateMinutes: 0 };
+    }
+    const gracePeriod = Number(record.grace_period ?? GRACE_PERIOD_MINUTES);
+    const shiftStartMinutes = this._timeToMinutes(record.shift_start_time);
+    const checkInMinutes = this._timeToMinutes(record.start_time);
+    const lateMinutes = Math.max(
+      0,
+      checkInMinutes - shiftStartMinutes - gracePeriod
+    );
+    return { isLate: lateMinutes > 0, lateMinutes };
+  }
+
+  /**
+   * Helper: คำนวณ Early Leave status จาก record
+   */
+  _calculateEarlyLeaveStatus(record) {
+    if (!record?.end_time || !record?.shift_end_time) {
+      return { isEarlyLeave: false, earlyLeaveMinutes: 0 };
+    }
+    const shiftEndMinutes = this._timeToMinutes(record.shift_end_time);
+    const checkOutMinutes = this._timeToMinutes(record.end_time);
+    const earlyLeaveMinutes = Math.max(0, shiftEndMinutes - checkOutMinutes);
+    return { isEarlyLeave: earlyLeaveMinutes > 0, earlyLeaveMinutes };
+  }
+
+  /**
+   * Helper: กำหนดสถานะ Attendance
+   */
+  _determineAttendanceState(record) {
+    if (!record) return ATTENDANCE_STATE.READY_TO_CHECK_IN;
+    if (record.end_time) return ATTENDANCE_STATE.COMPLETED;
+    if (record.break_start_time && !record.break_end_time)
+      return ATTENDANCE_STATE.ON_BREAK;
+    return ATTENDANCE_STATE.WORKING;
+  }
+
+  /**
    * ดึงข้อมูลการบันทึกเวลาของวันนี้ พร้อมสถานะ
    */
   async getTodayAttendance(employeeId) {
@@ -384,21 +421,12 @@ class AttendanceService {
       currentDate
     );
 
-    // กำหนดสถานะตาม conditions
-    let state = ATTENDANCE_STATE.READY_TO_CHECK_IN;
-
-    if (record) {
-      if (record.end_time) {
-        // มี end_time ครบแล้ว
-        state = ATTENDANCE_STATE.COMPLETED;
-      } else if (record.break_start_time && !record.break_end_time) {
-        // กำลังพักอยู่
-        state = ATTENDANCE_STATE.ON_BREAK;
-      } else {
-        // มี start_time แต่ยังไม่ check-out
-        state = ATTENDANCE_STATE.WORKING;
-      }
-    }
+    const state = this._determineAttendanceState(record);
+    const { isLate, lateMinutes } = this._calculateLateStatus(record);
+    const { isEarlyLeave, earlyLeaveMinutes } =
+      this._calculateEarlyLeaveStatus(record);
+    const isOverBreak =
+      record?.break_duration_minutes > record?.allowed_break_minutes;
 
     return {
       state,
@@ -412,15 +440,16 @@ class AttendanceService {
             shiftName: record.shift_name,
             shiftStartTime: record.shift_start_time,
             shiftEndTime: record.shift_end_time,
-            isLate: record.late_status === 1,
-            lateMinutes: record.late_minutes,
-            isEarlyLeave: record.early_leave_status === 1,
-            earlyLeaveMinutes: record.early_leave_minutes,
-            totalWorkMinutes: record.total_work_minutes,
-            breakDurationMinutes: record.break_duration_minutes,
-            isOverBreak: record.is_over_break === 1,
-            isPotentialOT: record.is_potential_ot === 1,
-            otMinutes: record.ot_minutes,
+            isLate,
+            lateMinutes,
+            isEarlyLeave,
+            earlyLeaveMinutes,
+            totalWorkMinutes: record.total_work_minutes || 0,
+            breakDurationMinutes: record.break_duration_minutes || 0,
+            isOverBreak: isOverBreak || false,
+            otStatus: record.otStatus === 1,
+            otStartTime: record.ot_start_time,
+            otEndTime: record.ot_end_time,
           }
         : null,
       date: currentDate,
@@ -436,25 +465,34 @@ class AttendanceService {
       options
     );
 
-    // แปลงข้อมูลให้อ่านง่ายขึ้น
-    const formattedRecords = result.records.map((record) => ({
-      id: record.id,
-      date: DateUtil.toDbDate(record.created_at),
-      checkInTime: record.start_time,
-      checkOutTime: record.end_time,
-      shiftName: record.shift_name,
-      shiftStartTime: record.shift_start_time,
-      shiftEndTime: record.shift_end_time,
-      isLate: record.late_status === 1,
-      lateMinutes: record.late_minutes,
-      isEarlyLeave: record.early_leave_status === 1,
-      earlyLeaveMinutes: record.early_leave_minutes,
-      totalWorkMinutes: record.total_work_minutes,
-      breakDurationMinutes: record.break_duration_minutes,
-      isOverBreak: record.is_over_break === 1,
-      isPotentialOT: record.is_potential_ot === 1,
-      otMinutes: record.ot_minutes,
-    }));
+    // แปลงข้อมูลให้อ่านง่ายขึ้น พร้อมคำนวณ late/early leave จาก shift time
+    const formattedRecords = result.records.map((record) => {
+      const { isLate, lateMinutes } = this._calculateLateStatus(record);
+      const { isEarlyLeave, earlyLeaveMinutes } =
+        this._calculateEarlyLeaveStatus(record);
+
+      return {
+        id: record.id,
+        date: DateUtil.toDbDate(record.created_at),
+        checkInTime: record.start_time,
+        checkOutTime: record.end_time,
+        breakStartTime: record.break_start_time,
+        breakEndTime: record.break_end_time,
+        shiftName: record.shift_name,
+        shiftStartTime: record.shift_start_time,
+        shiftEndTime: record.shift_end_time,
+        isLate,
+        lateMinutes,
+        isEarlyLeave,
+        earlyLeaveMinutes,
+        totalWorkMinutes: record.total_work_minutes || 0,
+        breakDurationMinutes: record.break_duration_minutes || 0,
+        // OT จากตาราง timestamp_records
+        otStatus: record.otStatus === 1,
+        otStartTime: record.ot_start_time,
+        otEndTime: record.ot_end_time,
+      };
+    });
 
     return {
       records: formattedRecords,

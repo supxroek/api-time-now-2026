@@ -14,13 +14,14 @@ class AttendanceModel {
   /**
    * ค้นหากะงานที่ Active สำหรับพนักงานในวันที่กำหนด
    * ลำดับความสำคัญ 1: วันที่เจาะจง (is_specific = 1)
-   * ลำดับความสำคัญ 2: กะประจำสัปดาห์ (is_shift = 1 หรือ 0)
-   * Fallback: Default Company Rule หรือ null
+   * ลำดับความสำคัญ 2: กะของพนักงาน (is_shift = 1)
+   * Fallback: กะปกติของบริษัท หรือ null
    */
   async findActiveShift(employeeId, date, companyId) {
-    // Priority 1: ค้นหา Specific Date Shift
+    // Priority 1: ค้นหา Specific Date Shift (กะเฉพาะวันที่)
     const [specificShift] = await pool.query(
-      `SELECT wt.* 
+      `SELECT wt.*,
+              TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) as break_duration
        FROM workingTime wt
        WHERE wt.is_specific = 1 
          AND wt.companyId = ?
@@ -34,32 +35,32 @@ class AttendanceModel {
       return specificShift[0];
     }
 
-    // Priority 2: ค้นหา Weekly Shift ปกติ
-    const dayOfWeek = new Date(date).getDay(); // 0=Sunday, 1=Monday, ...
-    const [weeklyShift] = await pool.query(
-      `SELECT wt.* 
+    // Priority 2: ค้นหา Shift ของพนักงาน (is_shift = 1)
+    const [employeeShift] = await pool.query(
+      `SELECT wt.*,
+              TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) as break_duration
        FROM workingTime wt
        WHERE wt.is_specific = 0
          AND wt.companyId = ?
          AND JSON_CONTAINS(wt.employeeId, CAST(? AS JSON))
-         AND JSON_CONTAINS(wt.dayOfWeek, CAST(? AS JSON))
        LIMIT 1`,
-      [companyId, employeeId, dayOfWeek]
+      [companyId, employeeId]
     );
 
-    if (weeklyShift.length > 0) {
-      return weeklyShift[0];
+    if (employeeShift.length > 0) {
+      return employeeShift[0];
     }
 
-    // Fallback: ค้นหา Default Company Rule
+    // Fallback: ค้นหากะปกติของบริษัท (ไม่มี employeeId หรือ employeeId เป็น null)
     const [defaultShift] = await pool.query(
-      `SELECT wt.* 
+      `SELECT wt.*,
+              TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) as break_duration
        FROM workingTime wt
        WHERE wt.companyId = ?
-         AND wt.is_default = 1
-         AND JSON_CONTAINS(wt.dayOfWeek, CAST(? AS JSON))
+         AND wt.is_specific = 0
+         AND (wt.employeeId IS NULL OR wt.employeeId = '[]')
        LIMIT 1`,
-      [companyId, dayOfWeek]
+      [companyId]
     );
 
     return defaultShift.length > 0 ? defaultShift[0] : null;
@@ -73,7 +74,7 @@ class AttendanceModel {
   async findTodayRecord(employeeId, date) {
     const [rows] = await pool.query(
       `SELECT * FROM timestamp_records 
-       WHERE employeeId = ? 
+       WHERE employeeid = ? 
          AND DATE(created_at) = ?
        LIMIT 1`,
       [employeeId, date]
@@ -83,41 +84,22 @@ class AttendanceModel {
 
   /**
    * บันทึกเวลาเข้างาน (Check-in)
+   * Note: ใช้เฉพาะคอลัมน์ที่มีใน timestamp_records table
    */
   async saveCheckIn(data) {
-    const {
-      employeeId,
-      companyId,
-      workingTimeId,
-      startTime,
-      lateStatus,
-      lateMinutes = 0, // ค่าเริ่มต้นเป็น 0
-      checkInLocation = null, // ค่าเริ่มต้นเป็น null
-      checkInNote = null, // ค่าเริ่มต้นเป็น null
-    } = data;
+    const { employeeId, companyId, workingTimeId, startTime } = data;
 
     const [result] = await pool.query(
       `INSERT INTO timestamp_records 
-       (employeeId, companyId, workingTimeId, start_time, late_status, late_minutes, check_in_location, check_in_note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        employeeId,
-        companyId,
-        workingTimeId,
-        startTime,
-        lateStatus,
-        lateMinutes,
-        checkInLocation,
-        checkInNote,
-      ]
+       (employeeid, companyId, workingTimeId, start_time, created_at)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [employeeId, companyId, workingTimeId, startTime]
     );
 
     return {
       id: result.insertId,
       employeeId,
       startTime,
-      lateStatus,
-      lateMinutes,
     };
   }
 
@@ -128,10 +110,16 @@ class AttendanceModel {
    */
   async findOpenRecord(employeeId, date) {
     const [rows] = await pool.query(
-      `SELECT tr.*, wt.end_time as shift_end_time, wt.start_time as shift_start_time
+      `SELECT tr.*, 
+              wt.end_time as shift_end_time, 
+              wt.start_time as shift_start_time,
+              wt.break_start_time as shift_break_start,
+              wt.break_end_time as shift_break_end,
+              wt.free_time as grace_period,
+              TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) as allowed_break_minutes
        FROM timestamp_records tr
        LEFT JOIN workingTime wt ON tr.workingTimeId = wt.id
-       WHERE tr.employeeId = ? 
+       WHERE tr.employeeid = ? 
          AND DATE(tr.created_at) = ?
          AND tr.end_time IS NULL
        LIMIT 1`,
@@ -142,52 +130,21 @@ class AttendanceModel {
 
   /**
    * บันทึกเวลาออกงาน (Check-out)
+   * Note: ใช้เฉพาะคอลัมน์ที่มีใน timestamp_records table
    */
   async saveCheckOut(recordId, data) {
-    const {
-      endTime,
-      earlyLeaveStatus,
-      earlyLeaveMinutes = 0, // ค่าเริ่มต้นเป็น 0
-      totalWorkMinutes = 0, // ค่าเริ่มต้นเป็น 0
-      isPotentialOT = 0, // ค่าเริ่มต้นเป็น 0
-      otMinutes = 0, // ค่าเริ่มต้นเป็น 0
-      checkOutLocation = null, // ค่าเริ่มต้นเป็น null
-      checkOutNote = null, // ค่าเริ่มต้นเป็น null
-    } = data;
+    const { endTime } = data;
 
     await pool.query(
       `UPDATE timestamp_records 
-       SET end_time = ?,
-           early_leave_status = ?,
-           early_leave_minutes = ?,
-           total_work_minutes = ?,
-           is_potential_ot = ?,
-           ot_minutes = ?,
-           check_out_location = ?,
-           check_out_note = ?,
-           updated_at = NOW()
+       SET end_time = ?
        WHERE id = ?`,
-      [
-        endTime,
-        earlyLeaveStatus,
-        earlyLeaveMinutes,
-        totalWorkMinutes,
-        isPotentialOT,
-        otMinutes,
-        checkOutLocation,
-        checkOutNote,
-        recordId,
-      ]
+      [endTime, recordId]
     );
 
     return {
       id: recordId,
       endTime,
-      earlyLeaveStatus,
-      earlyLeaveMinutes,
-      totalWorkMinutes,
-      isPotentialOT,
-      otMinutes,
     };
   }
 
@@ -198,12 +155,15 @@ class AttendanceModel {
    */
   async findRecordReadyForBreak(employeeId, date) {
     const [rows] = await pool.query(
-      `SELECT * FROM timestamp_records 
-       WHERE employeeId = ? 
-         AND DATE(created_at) = ?
-         AND start_time IS NOT NULL
-         AND end_time IS NULL
-         AND break_start_time IS NULL
+      `SELECT tr.*,
+              TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) as allowed_break_minutes
+       FROM timestamp_records tr
+       LEFT JOIN workingTime wt ON tr.workingTimeId = wt.id
+       WHERE tr.employeeid = ? 
+         AND DATE(tr.created_at) = ?
+         AND tr.start_time IS NOT NULL
+         AND tr.end_time IS NULL
+         AND tr.break_start_time IS NULL
        LIMIT 1`,
       [employeeId, date]
     );
@@ -215,10 +175,11 @@ class AttendanceModel {
    */
   async findRecordOnBreak(employeeId, date) {
     const [rows] = await pool.query(
-      `SELECT tr.*, wt.break_duration as allowed_break_minutes
+      `SELECT tr.*, 
+              TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) as allowed_break_minutes
        FROM timestamp_records tr
        LEFT JOIN workingTime wt ON tr.workingTimeId = wt.id
-       WHERE tr.employeeId = ? 
+       WHERE tr.employeeid = ? 
          AND DATE(tr.created_at) = ?
          AND tr.break_start_time IS NOT NULL
          AND tr.break_end_time IS NULL
@@ -234,7 +195,7 @@ class AttendanceModel {
   async saveBreakStart(recordId, breakStartTime) {
     await pool.query(
       `UPDATE timestamp_records 
-       SET break_start_time = ?, updated_at = NOW()
+       SET break_start_time = ?
        WHERE id = ?`,
       [breakStartTime, recordId]
     );
@@ -246,19 +207,16 @@ class AttendanceModel {
    * บันทึกเวลาสิ้นสุดการพัก
    */
   async saveBreakEnd(recordId, data) {
-    const { breakEndTime, breakDurationMinutes, isOverBreak } = data;
+    const { breakEndTime } = data;
 
     await pool.query(
       `UPDATE timestamp_records 
-       SET break_end_time = ?,
-           break_duration_minutes = ?,
-           is_over_break = ?,
-           updated_at = NOW()
+       SET break_end_time = ?
        WHERE id = ?`,
-      [breakEndTime, breakDurationMinutes, isOverBreak ? 1 : 0, recordId]
+      [breakEndTime, recordId]
     );
 
-    return { id: recordId, breakEndTime, breakDurationMinutes, isOverBreak };
+    return { id: recordId, breakEndTime };
   }
 
   // ==================== Query Methods ====================
@@ -269,13 +227,18 @@ class AttendanceModel {
   async getTodayAttendance(employeeId, date) {
     const [rows] = await pool.query(
       `SELECT tr.*, 
-              wt.name as shift_name,
+              wt.shift_name,
               wt.start_time as shift_start_time,
               wt.end_time as shift_end_time,
-              wt.break_duration as allowed_break_minutes
+              wt.break_start_time as shift_break_start,
+              wt.break_end_time as shift_break_end,
+              wt.free_time as grace_period,
+              TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) as allowed_break_minutes,
+              TIMESTAMPDIFF(MINUTE, tr.break_start_time, tr.break_end_time) as break_duration_minutes,
+              TIMESTAMPDIFF(MINUTE, tr.start_time, tr.end_time) as total_work_minutes
        FROM timestamp_records tr
        LEFT JOIN workingTime wt ON tr.workingTimeId = wt.id
-       WHERE tr.employeeId = ? 
+       WHERE tr.employeeid = ? 
          AND DATE(tr.created_at) = ?
        LIMIT 1`,
       [employeeId, date]
@@ -292,12 +255,15 @@ class AttendanceModel {
 
     let query = `
       SELECT tr.*, 
-             wt.name as shift_name,
+             wt.shift_name,
              wt.start_time as shift_start_time,
-             wt.end_time as shift_end_time
+             wt.end_time as shift_end_time,
+             wt.free_time as grace_period,
+             TIMESTAMPDIFF(MINUTE, tr.start_time, tr.end_time) as total_work_minutes,
+             TIMESTAMPDIFF(MINUTE, tr.break_start_time, tr.break_end_time) as break_duration_minutes
       FROM timestamp_records tr
       LEFT JOIN workingTime wt ON tr.workingTimeId = wt.id
-      WHERE tr.employeeId = ?
+      WHERE tr.employeeid = ?
     `;
     const params = [employeeId];
 
@@ -320,7 +286,7 @@ class AttendanceModel {
     let countQuery = `
       SELECT COUNT(*) as total 
       FROM timestamp_records tr
-      WHERE tr.employeeId = ?
+      WHERE tr.employeeid = ?
     `;
     const countParams = [employeeId];
 
@@ -349,22 +315,39 @@ class AttendanceModel {
 
   /**
    * ดึงสรุปการบันทึกเวลางาน (Monthly Summary)
+   * Note: คำนวณ late/early leave จาก comparison กับ shift time ใน SQL
    */
   async getAttendanceSummary(employeeId, month, year) {
     const [summary] = await pool.query(
       `SELECT 
          COUNT(*) as total_days,
-         SUM(CASE WHEN late_status = 1 THEN 1 ELSE 0 END) as late_days,
-         SUM(CASE WHEN early_leave_status = 1 THEN 1 ELSE 0 END) as early_leave_days,
-         SUM(CASE WHEN is_over_break = 1 THEN 1 ELSE 0 END) as over_break_days,
-         SUM(COALESCE(total_work_minutes, 0)) as total_work_minutes,
-         SUM(COALESCE(ot_minutes, 0)) as total_ot_minutes,
-         SUM(COALESCE(late_minutes, 0)) as total_late_minutes,
-         SUM(COALESCE(early_leave_minutes, 0)) as total_early_leave_minutes
-       FROM timestamp_records
-       WHERE employeeId = ?
-         AND MONTH(created_at) = ?
-         AND YEAR(created_at) = ?`,
+         SUM(CASE WHEN tr.start_time > ADDTIME(wt.start_time, SEC_TO_TIME(COALESCE(wt.free_time, 0) * 60)) THEN 1 ELSE 0 END) as late_days,
+         SUM(CASE WHEN tr.end_time IS NOT NULL AND tr.end_time < wt.end_time THEN 1 ELSE 0 END) as early_leave_days,
+         SUM(
+           CASE WHEN TIMESTAMPDIFF(MINUTE, tr.break_start_time, tr.break_end_time) > 
+                     TIMESTAMPDIFF(MINUTE, wt.break_start_time, wt.break_end_time) 
+           THEN 1 ELSE 0 END
+         ) as over_break_days,
+         SUM(COALESCE(TIMESTAMPDIFF(MINUTE, tr.start_time, tr.end_time), 0)) as total_work_minutes,
+         SUM(
+           CASE WHEN tr.otStatus = 1 AND tr.ot_start_time IS NOT NULL AND tr.ot_end_time IS NOT NULL
+           THEN TIMESTAMPDIFF(MINUTE, tr.ot_start_time, tr.ot_end_time) ELSE 0 END
+         ) as total_ot_minutes,
+         SUM(
+           CASE WHEN tr.start_time > ADDTIME(wt.start_time, SEC_TO_TIME(COALESCE(wt.free_time, 0) * 60))
+           THEN TIMESTAMPDIFF(MINUTE, ADDTIME(wt.start_time, SEC_TO_TIME(COALESCE(wt.free_time, 0) * 60)), tr.start_time)
+           ELSE 0 END
+         ) as total_late_minutes,
+         SUM(
+           CASE WHEN tr.end_time IS NOT NULL AND tr.end_time < wt.end_time
+           THEN TIMESTAMPDIFF(MINUTE, tr.end_time, wt.end_time)
+           ELSE 0 END
+         ) as total_early_leave_minutes
+       FROM timestamp_records tr
+       LEFT JOIN workingTime wt ON tr.workingTimeId = wt.id
+       WHERE tr.employeeid = ?
+         AND MONTH(tr.created_at) = ?
+         AND YEAR(tr.created_at) = ?`,
       [employeeId, month, year]
     );
 

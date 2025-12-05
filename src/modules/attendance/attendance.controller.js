@@ -26,14 +26,8 @@ class AttendanceController {
         });
       }
 
-      // ค่าที่ต้องส่งไปยัง service
-      const checkInData = {
-        location: req.body.location, // ตำแหน่งที่เช็คอิน
-        note: req.body.note, // หมายเหตุเพิ่มเติม
-      };
-
       // เรียกใช้ service เพื่อตรวจสอบและบันทึกเวลาเข้างาน
-      const result = AttendanceService.checkIn(employeeId, checkInData);
+      const result = await AttendanceService.checkIn(employeeId);
 
       res.status(200).json({
         success: true,
@@ -59,14 +53,8 @@ class AttendanceController {
         });
       }
 
-      // ค่าที่ต้องส่งไปยัง service
-      const checkOutData = {
-        location: req.body.location, // ตำแหน่งที่เช็คเอาท์
-        note: req.body.note, // หมายเหตุเพิ่มเติม
-      };
-
       // เรียกใช้ service เพื่อตรวจสอบและบันทึกเวลาออกงาน
-      const result = AttendanceService.checkOut(employeeId, checkOutData);
+      const result = await AttendanceService.checkOut(employeeId);
 
       res.status(200).json({
         success: true,
@@ -95,7 +83,7 @@ class AttendanceController {
       }
 
       // เรียกใช้ service เพื่อตรวจสอบและบันทึกเวลาเริ่มพัก
-      const result = AttendanceService.breakStart(employeeId, req.body);
+      const result = await AttendanceService.breakStart(employeeId);
 
       res.status(200).json({
         success: true,
@@ -122,7 +110,7 @@ class AttendanceController {
       }
 
       // เรียกใช้ service เพื่อตรวจสอบและบันทึกเวลาสิ้นสุดการพัก
-      const result = AttendanceService.breakEnd(employeeId, req.body);
+      const result = await AttendanceService.breakEnd(employeeId);
 
       res.status(200).json({
         success: true,
@@ -151,7 +139,7 @@ class AttendanceController {
       }
 
       // เรียกใช้ service เพื่อดึงข้อมูลการบันทึกเวลางานวันนี้
-      const result = AttendanceService.getTodayAttendance(employeeId);
+      const result = await AttendanceService.getTodayAttendance(employeeId);
 
       res.status(200).json({
         success: true,
@@ -180,12 +168,12 @@ class AttendanceController {
       const options = {
         startDate: req.query.startDate, // วันที่เริ่มต้น
         endDate: req.query.endDate, // วันที่สิ้นสุด
-        page: Number.parseInt(req.query.page, 1), // หน้าที่ต้องการดู (เริ่มต้นที่ 1)
-        limit: Number.parseInt(req.query.limit, 10), // จำนวนรายการต่อหน้า (เริ่มต้นที่ 10)
+        page: Number.parseInt(req.query.page, 10) || 1, // หน้าที่ต้องการดู (เริ่มต้นที่ 1)
+        limit: Number.parseInt(req.query.limit, 10) || 10, // จำนวนรายการต่อหน้า (เริ่มต้นที่ 10)
       };
 
       // เรียกใช้ service เพื่อดึงประวัติการบันทึกเวลางาน
-      const result = AttendanceService.getAttendanceHistory(
+      const result = await AttendanceService.getAttendanceHistory(
         employeeId,
         options
       );
@@ -220,7 +208,7 @@ class AttendanceController {
       };
 
       // เรียกใช้ service เพื่อดึงสรุปการบันทึกเวลางาน
-      const result = AttendanceService.getAttendanceSummary(
+      const result = await AttendanceService.getAttendanceSummary(
         employeeId,
         options
       );

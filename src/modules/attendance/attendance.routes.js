@@ -18,37 +18,17 @@ const {
 
 // ==================== Mobile/Web Application Routes ====================
 router
-  // Check-in: บันทึกเวลาเข้างาน
-  .post(
-    "/check-in",
-    authenticate,
-    validate(attendanceSchemas.checkIn),
-    attendanceController.checkIn
-  )
+  // Check-in: บันทึกเวลาเข้างาน (ไม่ต้อง validate body เพราะไม่มี input)
+  .post("/check-in", authenticate, attendanceController.checkIn)
 
-  // Check-out: บันทึกเวลาออกงาน
-  .post(
-    "/check-out",
-    authenticate,
-    validate(attendanceSchemas.checkOut),
-    attendanceController.checkOut
-  )
+  // Check-out: บันทึกเวลาออกงาน (ไม่ต้อง validate body เพราะไม่มี input)
+  .post("/check-out", authenticate, attendanceController.checkOut)
 
-  // Break Start: บันทึกเวลาเริ่มพัก
-  .post(
-    "/break/start",
-    authenticate,
-    validate(attendanceSchemas.breakStart),
-    attendanceController.breakStart
-  )
+  // Break Start: บันทึกเวลาเริ่มพัก (ไม่ต้อง validate body เพราะไม่มี input)
+  .post("/break/start", authenticate, attendanceController.breakStart)
 
-  // Break End: บันทึกเวลาสิ้นสุดการพัก
-  .post(
-    "/break/end",
-    authenticate,
-    validate(attendanceSchemas.breakEnd),
-    attendanceController.breakEnd
-  )
+  // Break End: บันทึกเวลาสิ้นสุดการพัก (ไม่ต้อง validate body เพราะไม่มี input)
+  .post("/break/end", authenticate, attendanceController.breakEnd)
 
   // Today: ดึงข้อมูลการบันทึกเวลางานวันนี้ (สำหรับแสดงสถานะปุ่มใน Frontend)
   .get("/today", authenticate, attendanceController.getTodayAttendance);
