@@ -35,8 +35,11 @@ class AuthService {
       // สร้าง token
       const token = JWT.generateToken({
         id: user.id,
-        company_id: user.company_id,
+        email: user.email,
         role: user.role,
+        employee_id: user.employee_id,
+        company_id: user.company_id,
+        is_active: user.is_active,
       });
       user.token = token;
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
@@ -106,8 +109,11 @@ class AuthService {
       // สร้าง token ใหม่
       const newToken = JWT.generateToken({
         id: payload.id,
-        company_id: payload.company_id,
+        email: payload.email,
         role: payload.role,
+        employee_id: payload.employee_id,
+        company_id: payload.company_id,
+        is_active: payload.is_active,
       });
       // คำนวณวันหมดอายุของ token ใหม่
       const expiresAt = DateUtil.getExpirationDate(JWT_EXPIRES_IN);

@@ -30,8 +30,11 @@ const authenticate = (req, res, next) => {
     // เพิ่มข้อมูล user และ company ใน request object
     req.user = {
       id: decoded.id,
-      company_id: decoded.company_id,
+      email: decoded.email,
       role: decoded.role,
+      employee_id: decoded.employee_id,
+      company_id: decoded.company_id,
+      is_active: decoded.is_active,
     }; // req.user สำหรับเก็บข้อมูลผู้ใช้ทั้งหมด
 
     next();

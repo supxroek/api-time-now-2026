@@ -191,10 +191,52 @@ const employeeSchemas = {
   }),
 };
 
+// ========================================
+// Attendance Validation Schemas
+// ========================================
+const attendanceSchemas = {
+  // Check-in validation
+  checkIn: Joi.object({
+    location: Joi.string().max(500).allow("", null), // พิกัด GPS หรือชื่อสถานที่
+    note: Joi.string().max(500).allow("", null), // หมายเหตุ
+  }),
+
+  // Check-out validation
+  checkOut: Joi.object({
+    location: Joi.string().max(500).allow("", null),
+    note: Joi.string().max(500).allow("", null),
+  }),
+
+  // Break start validation
+  breakStart: Joi.object({
+    note: Joi.string().max(255).allow("", null),
+  }),
+
+  // Break end validation
+  breakEnd: Joi.object({
+    note: Joi.string().max(255).allow("", null),
+  }),
+
+  // Get history validation (query params)
+  getHistory: Joi.object({
+    startDate: Joi.date().iso().allow("", null),
+    endDate: Joi.date().iso().allow("", null),
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+  }),
+
+  // Get summary validation (query params)
+  getSummary: Joi.object({
+    month: Joi.number().integer().min(1).max(12).allow(null),
+    year: Joi.number().integer().min(2000).max(2100).allow(null),
+  }),
+};
+
 module.exports = {
   validate,
   authSchemas,
   companySchemas,
   departmentSchemas,
   employeeSchemas,
+  attendanceSchemas,
 };
