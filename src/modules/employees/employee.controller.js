@@ -97,18 +97,19 @@ class EmployeeController {
   }
 
   // POST /api/company/employees/import
+  // รองรับทั้ง JSON body และไฟล์ Excel (XLS/XLSX)
   async importEmployees(req, res, next) {
     try {
       const companyId = req.user?.company_id;
-      // รับไฟล์จาก request
-      const file = req.file;
-      const importedCount = await EmployeeService.importEmployees(
+      // ส่งข้อมูลทั้งหมดไปให้ service จัดการ
+      const result = EmployeeService.importEmployees({
         companyId,
-        file
-      );
+        file: req.file,
+        body: req.body,
+      });
       res.status(200).json({
         success: true,
-        message: `${importedCount} employees imported successfully`,
+        data: result,
       });
     } catch (error) {
       next(error);
