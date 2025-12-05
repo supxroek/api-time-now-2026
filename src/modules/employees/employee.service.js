@@ -8,7 +8,7 @@
 // import models and helpers
 const pool = require("../../config/database");
 const EmployeeModel = require("./employee.model");
-const Duration = require("../../utilities/duration");
+const DateUtil = require("../../utilities/date");
 const XLSX = require("xlsx");
 
 // ==================== Constants ====================
@@ -99,14 +99,14 @@ class EmployeeService {
     const employees = await EmployeeModel.findAllByCompanyId(companyId);
     // ตรวจสอบคอลัมน์ resign_date ว่าเป็น NULL หรือไม่ (พนักงานที่ยังไม่ลาออก)
     // หากไม่เป็น null ให้ตรวจสอบว่าวันที่ลาออกต้องมากกว่าวันที่ปัจจุบัน (resign_date > current date)
-    const currentDate = new Date();
+    const currentDate = DateUtil.now();
     // กรองเอาเฉพาะพนักงานที่ยังไม่ลาออก
     const filteredEmployees = employees.filter((employee) => {
       if (!employee.resign_date) {
         return true; // ยังไม่ลาออก
       }
-      const resignDate = new Date(employee.resign_date);
-      return resignDate > currentDate; // ยังไม่ถึงวันลาออก
+      // ใช้ DateUtil.isAfter() เพื่อเปรียบเทียบวันที่
+      return DateUtil.isAfter(employee.resign_date, currentDate); // ยังไม่ถึงวันลาออก
     });
 
     return filteredEmployees;
@@ -227,16 +227,17 @@ class EmployeeService {
       }
 
       // แปลง resignDate เป็นวัตถุ Date
-      const parsedResignDate = await Duration.parseISOToDate(resignDate);
+      const parsedResignDate = DateUtil.parseISOToDate(resignDate);
       // ตรวจสอบให้แน่ใจว่า resignDate ไม่อยู่ก่อน start_date ของพนักงาน
       const employee = await EmployeeModel.findById(companyId, employeeId);
       if (!employee) {
         throw new Error(`Employee with ID:${employeeId} not found`);
       }
-      const startDate = employee.start_date
-        ? new Date(employee.start_date)
-        : null;
-      if (startDate && parsedResignDate < startDate) {
+      // ใช้ DateUtil.isBefore() เพื่อเปรียบเทียบวันที่
+      if (
+        employee.start_date &&
+        DateUtil.isBefore(parsedResignDate, employee.start_date)
+      ) {
         throw new Error("resignDate cannot be earlier than start_date");
       }
 

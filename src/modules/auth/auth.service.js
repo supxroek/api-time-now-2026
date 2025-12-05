@@ -8,7 +8,7 @@
 // import models and utilities
 const pool = require("../../config/database");
 const authModel = require("./auth.model");
-const duration = require("../../utilities/duration");
+const DateUtil = require("../../utilities/date");
 const JWT = require("./handleToken");
 
 require("dotenv").config();
@@ -110,8 +110,7 @@ class AuthService {
         role: payload.role,
       });
       // คำนวณวันหมดอายุของ token ใหม่
-      const ms = await duration.parseDurationToMs(JWT_EXPIRES_IN);
-      const expiresAt = new Date(Date.now() + ms);
+      const expiresAt = DateUtil.getExpirationDate(JWT_EXPIRES_IN);
       // บันทึก refresh token ใหม่ในฐานข้อมูล
       await authModel.updateRefreshToken(payload.id, newToken, expiresAt);
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
