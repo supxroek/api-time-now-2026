@@ -126,7 +126,14 @@ class DateUtil {
    * ใช้สำหรับ token expiration
    */
   getExpirationDate(durationStr) {
-    const regex = /(\d+)([smhd])/g;
+    // การตรวจสอบพื้นฐานและการจำกัดขอบเขตเพื่อหลีกเลี่ยง backtracking ที่ร้ายแรง:
+    // - ตรวจสอบให้แน่ใจว่าเป็นข้อมูลประเภทสตริง
+    // - จำกัดจำนวนตัวเลขให้อยู่ในขอบเขตที่สมเหตุสมผล (1..7)
+    if (!durationStr || typeof durationStr !== "string") {
+      throw new Error("Invalid duration string");
+    }
+    // จำกัดความยาวของตัวเลขเพื่อหลีกเลี่ยงค่าป้อนเข้าที่ผิดปกติ เช่น ตัวเลขล้านหลัก
+    const regex = /(\d{1,7})([smhd])/g;
     let match;
     let totalMs = 0;
 
