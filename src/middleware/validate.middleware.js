@@ -232,6 +232,37 @@ const attendanceSchemas = {
   }),
 };
 
+// ========================================
+// Devices Validation Schemas
+// ========================================
+const devicesSchemas = {
+  // Create device validation
+  createDevice: Joi.object({
+    name: Joi.string().min(1).max(255).required(), // ชื่ออุปกรณ์
+    locationURL: Joi.string().uri().max(255).allow("", null), // URL สถานที่ (Google Maps)
+    hwid: Joi.string().min(1).max(45).required(), // Hardware ID
+    passcode: Joi.string().min(1).max(45).required(), // รหัสผ่านอุปกรณ์
+    employeeIds: Joi.array()
+      .items(Joi.number().integer().positive())
+      .default([]), // รายการพนักงานที่ผูกกับอุปกรณ์
+  }),
+
+  // Update device validation
+  updateDevice: Joi.object({
+    name: Joi.string().min(1).max(255),
+    locationURL: Joi.string().uri().max(255).allow("", null),
+    hwid: Joi.string().min(1).max(45),
+    passcode: Joi.string().min(1).max(45),
+    employeeIds: Joi.array().items(Joi.number().integer().positive()),
+  }).min(1), // ต้องมีอย่างน้อย 1 field
+
+  // Sync device validation (สำหรับเครื่อง Time Attendance)
+  syncDevice: Joi.object({
+    hwid: Joi.string().min(1).max(45).required(), // Hardware ID
+    passcode: Joi.string().min(1).max(45).required(), // รหัสผ่านอุปกรณ์
+  }),
+};
+
 module.exports = {
   validate,
   authSchemas,
@@ -239,4 +270,5 @@ module.exports = {
   departmentSchemas,
   employeeSchemas,
   attendanceSchemas,
+  devicesSchemas,
 };

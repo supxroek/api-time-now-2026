@@ -9,7 +9,7 @@ const express = require("express");
 const router = express.Router();
 
 // import attendance controller and middleware
-const attendanceController = require("./attendance.controller");
+const AttendanceController = require("./attendance.controller");
 const { authenticate } = require("../../middleware/auth.middleware");
 const {
   validate,
@@ -19,19 +19,19 @@ const {
 // ==================== Mobile/Web Application Routes ====================
 router
   // Check-in: บันทึกเวลาเข้างาน (ไม่ต้อง validate body เพราะไม่มี input)
-  .post("/check-in", authenticate, attendanceController.checkIn)
+  .post("/check-in", authenticate, AttendanceController.checkIn)
 
   // Check-out: บันทึกเวลาออกงาน (ไม่ต้อง validate body เพราะไม่มี input)
-  .post("/check-out", authenticate, attendanceController.checkOut)
+  .post("/check-out", authenticate, AttendanceController.checkOut)
 
   // Break Start: บันทึกเวลาเริ่มพัก (ไม่ต้อง validate body เพราะไม่มี input)
-  .post("/break/start", authenticate, attendanceController.breakStart)
+  .post("/break/start", authenticate, AttendanceController.breakStart)
 
   // Break End: บันทึกเวลาสิ้นสุดการพัก (ไม่ต้อง validate body เพราะไม่มี input)
-  .post("/break/end", authenticate, attendanceController.breakEnd)
+  .post("/break/end", authenticate, AttendanceController.breakEnd)
 
   // Today: ดึงข้อมูลการบันทึกเวลางานวันนี้ (สำหรับแสดงสถานะปุ่มใน Frontend)
-  .get("/today", authenticate, attendanceController.getTodayAttendance);
+  .get("/today", authenticate, AttendanceController.getTodayAttendance);
 
 // ==================== Admin/Manager/HR Routes ====================
 router
@@ -40,7 +40,7 @@ router
     "/history",
     authenticate,
     validate(attendanceSchemas.getHistory, "query"),
-    attendanceController.getAttendanceHistory
+    AttendanceController.getAttendanceHistory
   )
 
   // Summary: ดึงสรุปการบันทึกเวลางาน (รายเดือน)
@@ -48,7 +48,7 @@ router
     "/summary",
     authenticate,
     validate(attendanceSchemas.getSummary, "query"),
-    attendanceController.getAttendanceSummary
+    AttendanceController.getAttendanceSummary
   );
 
 module.exports = router;
