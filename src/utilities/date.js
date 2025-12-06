@@ -83,6 +83,28 @@ class DateUtil {
     return parsed ? parsed.format(DATE_FORMATS.DB_DATETIME) : null;
   }
 
+  /**
+   * Format เวลาสำหรับบันทึกลง Database (TIME column) - HH:mm:ss
+   */
+  toDbTime(timeInput) {
+    if (!timeInput) return null;
+
+    // Accept time-only strings like "17:00" or "17:00:00"
+    const timeOnlyRegex = /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+    if (typeof timeInput === "string" && timeOnlyRegex.test(timeInput)) {
+      // Ensure format is HH:mm:ss
+      const parts = timeInput.split(":");
+      if (parts.length === 2) {
+        return `${parts[0].padStart(2, "0")}:${parts[1]}:00`;
+      }
+      return `${parts[0].padStart(2, "0")}:${parts[1]}:${parts[2]}`;
+    }
+
+    // For datetime input, extract the time part
+    const parsed = this.parse(timeInput);
+    return parsed ? parsed.format("HH:mm:ss") : null;
+  }
+
   // ==================== Validation Methods ====================
 
   /**

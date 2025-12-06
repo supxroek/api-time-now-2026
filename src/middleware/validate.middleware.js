@@ -263,6 +263,42 @@ const devicesSchemas = {
   }),
 };
 
+// ========================================
+// Overtime Validation Schemas
+// ========================================
+const overtimeSchemas = {
+  create: Joi.object({
+    overTimeName: Joi.string().min(2).max(255).required(),
+    ot_start_time: Joi.string()
+      .pattern(/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+      .required()
+      .messages({
+        "string.pattern.base":
+          "ot_start_time must be in HH:mm or HH:mm:ss format",
+      }),
+    ot_end_time: Joi.string()
+      .pattern(/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+      .required()
+      .messages({
+        "string.pattern.base":
+          "ot_end_time must be in HH:mm or HH:mm:ss format",
+      }),
+    employeeId: Joi.alternatives()
+      .try(
+        Joi.string().required(),
+        Joi.array().items(Joi.number().integer()).required()
+      )
+      .required()
+      .custom((value) => {
+        // แปลงเป็น JSON string ถ้าเป็น array
+        if (Array.isArray(value)) {
+          return JSON.stringify(value);
+        }
+        return value;
+      }),
+  }),
+};
+
 module.exports = {
   validate,
   authSchemas,
@@ -271,4 +307,5 @@ module.exports = {
   employeeSchemas,
   attendanceSchemas,
   devicesSchemas,
+  overtimeSchemas,
 };

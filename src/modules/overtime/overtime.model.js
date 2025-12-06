@@ -1,0 +1,35 @@
+const pool = require("../../config/database");
+
+// Overtime Model Class
+class OvertimeModel {
+  // ดึงข้อมูลชั่วโมงทำงานล่วงเวลาทั้งหมด
+  async findAll(companyId) {
+    const [rows] = await pool.query(
+      "SELECT * FROM overtime WHERE companyId = ?",
+      [companyId]
+    );
+    return rows;
+  }
+
+  // สร้างชั่วโมงทำงานล่วงเวลาใหม่
+  async create(overtimeData, companyId) {
+    const { overTimeName, ot_start_time, ot_end_time, employeeId } =
+      overtimeData;
+    const [result] = await pool.query(
+      "INSERT INTO overtime (overTimeName, ot_start_time, ot_end_time, employeeId, companyId) VALUES (?, ?, ?, ?, ?)",
+      [overTimeName, ot_start_time, ot_end_time, employeeId, companyId]
+    );
+    return { id: result.insertId, ...overtimeData, companyId };
+  }
+
+  // ค้นหาชั่วโมงทำงานล่วงเวลาตามชื่อภายในบริษัท
+  async findByName(overTimeName, companyId) {
+    const [rows] = await pool.query(
+      "SELECT * FROM overtime WHERE overTimeName = ? AND companyId = ?",
+      [overTimeName, companyId]
+    );
+    return rows[0];
+  }
+}
+
+module.exports = new OvertimeModel();
