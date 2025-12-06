@@ -21,9 +21,6 @@ router
   // GET /api/devices/ - ดึงรายการอุปกรณ์ทั้งหมด
   .get("/", authenticate, DevicesController.getAllDevices)
 
-  // GET /api/devices/:id - ดึงข้อมูลอุปกรณ์ตาม ID
-  .get("/:id", authenticate, DevicesController.getDeviceById)
-
   // POST /api/devices/ - เพิ่มอุปกรณ์ใหม่
   .post(
     "/",
@@ -38,6 +35,9 @@ router
     validate(devicesSchemas.syncDevice),
     DevicesController.syncDevices
   )
+
+  // GET /api/devices/:id - ดึงข้อมูลอุปกรณ์ตาม ID
+  .get("/:id", authenticate, DevicesController.getDeviceById)
 
   // PATCH /api/devices/:id - อัปเดตข้อมูลอุปกรณ์
   .patch(

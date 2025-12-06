@@ -16,7 +16,7 @@ class DevicesController {
    */
   async getAllDevices(req, res, next) {
     try {
-      const companyId = req.user.companyId;
+      const companyId = req.user.company_id;
 
       const result = await DevicesService.getAllDevices(companyId);
 
@@ -35,7 +35,7 @@ class DevicesController {
    */
   async getDeviceById(req, res, next) {
     try {
-      const companyId = req.user.companyId;
+      const companyId = req.user.company_id;
       const deviceId = Number.parseInt(req.params.id);
 
       const result = await DevicesService.getDeviceById(deviceId, companyId);
@@ -55,7 +55,7 @@ class DevicesController {
    */
   async createDevice(req, res, next) {
     try {
-      const companyId = req.user.companyId;
+      const companyId = req.user.company_id;
       const deviceData = {
         name: req.body.name,
         locationURL: req.body.locationURL,
@@ -81,7 +81,7 @@ class DevicesController {
    */
   async updateDevice(req, res, next) {
     try {
-      const companyId = req.user.companyId;
+      const companyId = req.user.company_id;
       const deviceId = Number.parseInt(req.params.id);
 
       // รับเฉพาะ field ที่ส่งมา
