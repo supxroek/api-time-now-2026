@@ -299,6 +299,63 @@ const overtimeSchemas = {
   }),
 };
 
+// ========================================
+// Shifts Validation Schemas
+// ========================================
+const timePattern = /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
+const shiftsSchemas = {
+  create: Joi.object({
+    shift_name: Joi.string().min(2).max(255).required(),
+    free_time: Joi.number().integer().min(0).default(0),
+    is_shift: Joi.number().integer().valid(0, 1).default(1),
+    is_night_shift: Joi.number().integer().valid(0, 1).default(0),
+    is_specific: Joi.number().integer().valid(0, 1).default(0),
+    month: Joi.number().integer().min(1).max(12).allow(null),
+    date: Joi.alternatives()
+      .try(Joi.string(), Joi.array().items(Joi.number().integer()))
+      .allow(null),
+    start_time: Joi.string().pattern(timePattern).allow(null),
+    end_time: Joi.string().pattern(timePattern).allow(null),
+    is_break: Joi.number().integer().valid(0, 1).default(1),
+    break_start_time: Joi.string().pattern(timePattern).allow(null),
+    break_end_time: Joi.string().pattern(timePattern).allow(null),
+    employeeId: Joi.alternatives()
+      .try(Joi.string(), Joi.array().items(Joi.number().integer()))
+      .allow(null),
+  }),
+
+  update: Joi.object({
+    shift_name: Joi.string().min(2).max(255),
+    free_time: Joi.number().integer().min(0),
+    is_shift: Joi.number().integer().valid(0, 1),
+    is_night_shift: Joi.number().integer().valid(0, 1),
+    is_specific: Joi.number().integer().valid(0, 1),
+    month: Joi.number().integer().min(1).max(12).allow(null),
+    date: Joi.alternatives()
+      .try(Joi.string(), Joi.array().items(Joi.number().integer()))
+      .allow(null),
+    start_time: Joi.string().pattern(timePattern).allow(null),
+    end_time: Joi.string().pattern(timePattern).allow(null),
+    is_break: Joi.number().integer().valid(0, 1),
+    break_start_time: Joi.string().pattern(timePattern).allow(null),
+    break_end_time: Joi.string().pattern(timePattern).allow(null),
+    employeeId: Joi.alternatives()
+      .try(Joi.string(), Joi.array().items(Joi.number().integer()))
+      .allow(null),
+  }).min(1),
+
+  assign: Joi.object({
+    shiftId: Joi.number().integer().positive().required(),
+    employeeIds: Joi.alternatives()
+      .try(
+        Joi.string().required(),
+        Joi.array().items(Joi.number().integer().positive()).min(1).required()
+      )
+      .required(),
+  }),
+};
+
 module.exports = {
   validate,
   authSchemas,
@@ -308,4 +365,5 @@ module.exports = {
   attendanceSchemas,
   devicesSchemas,
   overtimeSchemas,
+  shiftsSchemas,
 };

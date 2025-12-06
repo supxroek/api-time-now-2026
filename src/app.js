@@ -16,7 +16,7 @@ const employeeRoutes = require("./modules/employees/employee.routes");
 const attendanceRoutes = require("./modules/attendance/attendance.routes");
 const devicesRoutes = require("./modules/devices/devices.routes");
 const overtimeRoutes = require("./modules/overtime/overtime.routes");
-const { override } = require("joi");
+const shiftRoutes = require("./modules/shifts/shifts.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -31,6 +31,7 @@ router.use(`${API_VERSION}/company/employees`, employeeRoutes);
 router.use(`${API_VERSION}/attendance`, attendanceRoutes);
 router.use(`${API_VERSION}/devices`, devicesRoutes);
 router.use(`${API_VERSION}/overtimes`, overtimeRoutes);
+router.use(`${API_VERSION}/shifts`, shiftRoutes);
 
 /**
  * API Info route
@@ -66,6 +67,12 @@ router.use(API_VERSION, (req, res) => {
           "อัพเดตสถานะพนักงานเป็นลาออก",
         "POST /api/company/employees/import":
           "นำเข้าข้อมูลพนักงานจากไฟล์ Excel, CSV",
+      },
+      shifts: {
+        "GET /api/shifts": "ดึงรายชื่อกะการทำงานทั้งหมด",
+        "POST /api/shifts": "สร้างกะการทำงานใหม่",
+        "PATCH /api/shifts/:id": "อัปเดตกะการทำงาน",
+        "POST /api/shifts/assign": "กำหนดกะการทำงานให้พนักงาน",
       },
       overtime: {
         "GET /api/overtimes": "ดึงรายชื่อชั่วโมงทำงานล่วงเวลาทั้งหมด",
