@@ -356,6 +356,37 @@ const shiftsSchemas = {
   }),
 };
 
+// ========================================
+// Request Validation Schemas
+// ========================================
+const requestSchemas = {
+  // สร้างคำขอลืมบันทึกเวลา
+  forgetTime: Joi.object({
+    timestamp_type: Joi.string()
+      .valid("work_in", "break_in", "ot_in", "work_out", "break_out", "ot_out")
+      .required()
+      .messages({
+        "any.only":
+          "timestamp_type must be one of: work_in, break_in, ot_in, work_out, break_out, ot_out",
+      }),
+    forget_date: Joi.date().iso().required(),
+    forget_time: Joi.string()
+      .pattern(/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+      .required()
+      .messages({
+        "string.pattern.base":
+          "forget_time must be in HH:mm or HH:mm:ss format",
+      }),
+    reason: Joi.string().min(1).max(1000).required(),
+    evidence: Joi.string().max(65535).allow("", null), // base64 image or URL
+  }),
+
+  // Validate id param
+  idParam: Joi.object({
+    id: Joi.number().integer().positive().required(),
+  }),
+};
+
 module.exports = {
   validate,
   authSchemas,
@@ -366,4 +397,5 @@ module.exports = {
   devicesSchemas,
   overtimeSchemas,
   shiftsSchemas,
+  requestSchemas,
 };

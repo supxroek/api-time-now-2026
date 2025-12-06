@@ -17,6 +17,7 @@ const attendanceRoutes = require("./modules/attendance/attendance.routes");
 const devicesRoutes = require("./modules/devices/devices.routes");
 const overtimeRoutes = require("./modules/overtime/overtime.routes");
 const shiftRoutes = require("./modules/shifts/shifts.routes");
+const requestRoutes = require("./modules/request/request.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -32,6 +33,7 @@ router.use(`${API_VERSION}/attendance`, attendanceRoutes);
 router.use(`${API_VERSION}/devices`, devicesRoutes);
 router.use(`${API_VERSION}/overtimes`, overtimeRoutes);
 router.use(`${API_VERSION}/shifts`, shiftRoutes);
+router.use(`${API_VERSION}/requests`, requestRoutes);
 
 /**
  * API Info route
@@ -86,6 +88,13 @@ router.use(API_VERSION, (req, res) => {
         "GET /api/attendance/today": "ดึงบันทึกการเข้างานของวันนี้",
         "GET /api/attendance/history": "ดึงประวัติการเข้างาน",
         "GET /api/attendance/summary": "ดึงสรุปการเข้างานรายเดือน",
+      },
+      requests: {
+        "POST /api/requests/forget-time": "ส่งคำขอลืมบันทึกเวลา",
+        "GET /api/requests/my-requests": "ดึงรายการคำขอของผู้ใช้",
+        "GET /api/requests/pending": "ดึงคำขอที่รอการอนุมัติ",
+        "PATCH /api/requests/:id/approve": "อนุมัติคำขอ",
+        "PATCH /api/requests/:id/reject": "ปฏิเสธคำขอ",
       },
       devices: {
         "GET /api/devices": "ดึงรายชื่ออุปกรณ์ทั้งหมด",
