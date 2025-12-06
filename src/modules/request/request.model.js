@@ -1,4 +1,5 @@
 const pool = require("../../config/database");
+const { randomInt } = require("node:crypto");
 
 // Model Class
 class RequestModel {
@@ -10,7 +11,10 @@ class RequestModel {
   _generateRequestId() {
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replaceAll("-", "");
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const random = randomInt(0, Math.pow(36, 4))
+      .toString(36)
+      .padStart(4, "0")
+      .toUpperCase();
     return `REQ-${dateStr}-${random}`;
   }
 
