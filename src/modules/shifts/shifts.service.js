@@ -66,6 +66,7 @@ class ShiftService {
 
       // commit transaction
       await connection.commit(); // กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
+      connection.release();
       return newShift;
     } catch (error) {
       // rollback transaction
@@ -109,7 +110,10 @@ class ShiftService {
       }
 
       await ShiftModel.update(shiftId, shiftData, companyId);
+
+      // commit transaction
       await connection.commit();
+      connection.release();
 
       // ดึงข้อมูลที่อัปเดตแล้วกลับมา
       return await ShiftModel.findById(shiftId, companyId);
@@ -156,6 +160,7 @@ class ShiftService {
 
       // commit transaction
       await connection.commit();
+      connection.release();
 
       // ดึงข้อมูลที่อัปเดตแล้วกลับมา
       return await ShiftModel.findById(shiftId, companyId);

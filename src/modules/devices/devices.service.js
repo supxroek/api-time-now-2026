@@ -106,42 +106,56 @@ class DevicesService {
    * @returns {Promise<Object>} ข้อมูลอุปกรณ์ที่สร้าง
    */
   async createDevice(companyId, deviceData) {
-    const { name, locationURL, hwid, passcode, employeeIds } = deviceData;
+    // เริ่มต้น transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    try {
+      const { name, locationURL, hwid, passcode, employeeIds } = deviceData;
 
-    // ตรวจสอบ HWID ซ้ำ
-    const isHWIDExists = await DevicesModel.isHWIDExists(hwid);
-    if (isHWIDExists) {
-      const error = new Error("HWID นี้ถูกใช้งานแล้ว");
-      error.statusCode = 409;
+      // ตรวจสอบ HWID ซ้ำ
+      const isHWIDExists = await DevicesModel.isHWIDExists(hwid);
+      if (isHWIDExists) {
+        const error = new Error("HWID นี้ถูกใช้งานแล้ว");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // ตรวจสอบความถูกต้องของ employeeIds (ถ้ามี)
+      if (employeeIds && employeeIds.length > 0) {
+        await this._validateEmployeeIds(employeeIds, companyId);
+      }
+
+      // สร้างอุปกรณ์
+      const newDevice = await DevicesModel.create({
+        name,
+        locationURL,
+        hwid,
+        passcode,
+        employeeId: employeeIds || [],
+        companyId,
+      });
+
+      // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
+      await connection.commit();
+
+      return {
+        message: "สร้างอุปกรณ์สำเร็จ",
+        device: {
+          id: newDevice.id,
+          name: newDevice.name,
+          locationURL: newDevice.locationURL,
+          hwid: newDevice.hwid,
+          employeeIds: employeeIds || [],
+          companyId: newDevice.companyId,
+        },
+      };
+    } catch (error) {
+      // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
-
-    // ตรวจสอบความถูกต้องของ employeeIds (ถ้ามี)
-    if (employeeIds && employeeIds.length > 0) {
-      await this._validateEmployeeIds(employeeIds, companyId);
-    }
-
-    // สร้างอุปกรณ์
-    const newDevice = await DevicesModel.create({
-      name,
-      locationURL,
-      hwid,
-      passcode,
-      employeeId: employeeIds || [],
-      companyId,
-    });
-
-    return {
-      message: "สร้างอุปกรณ์สำเร็จ",
-      device: {
-        id: newDevice.id,
-        name: newDevice.name,
-        locationURL: newDevice.locationURL,
-        hwid: newDevice.hwid,
-        employeeIds: employeeIds || [],
-        companyId: newDevice.companyId,
-      },
-    };
   }
 
   // ==================== Update Methods ====================
@@ -154,60 +168,74 @@ class DevicesService {
    * @returns {Promise<Object>} ผลลัพธ์การอัปเดต
    */
   async updateDevice(deviceId, companyId, updateData) {
-    // ตรวจสอบว่าอุปกรณ์มีอยู่
-    const device = await DevicesModel.findById(deviceId, companyId);
-    if (!device) {
-      const error = new Error("ไม่พบอุปกรณ์");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    // ตรวจสอบ HWID ซ้ำ (ถ้าเปลี่ยน)
-    if (updateData.hwid && updateData.hwid !== device.HWID) {
-      const isHWIDExists = await DevicesModel.isHWIDExists(
-        updateData.hwid,
-        deviceId
-      );
-      if (isHWIDExists) {
-        const error = new Error("HWID นี้ถูกใช้งานแล้ว");
-        error.statusCode = 409;
+    // เริ่มต้น transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    try {
+      // ตรวจสอบว่าอุปกรณ์มีอยู่
+      const device = await DevicesModel.findById(deviceId, companyId);
+      if (!device) {
+        const error = new Error("ไม่พบอุปกรณ์");
+        error.statusCode = 404;
         throw error;
       }
-    }
 
-    // ตรวจสอบความถูกต้องของ employeeIds (ถ้ามี)
-    if (updateData.employeeIds && updateData.employeeIds.length > 0) {
-      await this._validateEmployeeIds(updateData.employeeIds, companyId);
-    }
+      // ตรวจสอบ HWID ซ้ำ (ถ้าเปลี่ยน)
+      if (updateData.hwid && updateData.hwid !== device.HWID) {
+        const isHWIDExists = await DevicesModel.isHWIDExists(
+          updateData.hwid,
+          deviceId
+        );
+        if (isHWIDExists) {
+          const error = new Error("HWID นี้ถูกใช้งานแล้ว");
+          error.statusCode = 409;
+          throw error;
+        }
+      }
 
-    // เตรียมข้อมูลสำหรับอัปเดต
-    const dataToUpdate = {};
-    if (updateData.name !== undefined) dataToUpdate.name = updateData.name;
-    if (updateData.locationURL !== undefined)
-      dataToUpdate.locationURL = updateData.locationURL;
-    if (updateData.hwid !== undefined) dataToUpdate.hwid = updateData.hwid;
-    if (updateData.passcode !== undefined)
-      dataToUpdate.passcode = updateData.passcode;
-    if (updateData.employeeIds !== undefined)
-      dataToUpdate.employeeId = updateData.employeeIds;
+      // ตรวจสอบความถูกต้องของ employeeIds (ถ้ามี)
+      if (updateData.employeeIds && updateData.employeeIds.length > 0) {
+        await this._validateEmployeeIds(updateData.employeeIds, companyId);
+      }
 
-    // อัปเดต
-    const updated = await DevicesModel.update(
-      deviceId,
-      companyId,
-      dataToUpdate
-    );
+      // เตรียมข้อมูลสำหรับอัปเดต
+      const dataToUpdate = {};
+      if (updateData.name !== undefined) dataToUpdate.name = updateData.name;
+      if (updateData.locationURL !== undefined)
+        dataToUpdate.locationURL = updateData.locationURL;
+      if (updateData.hwid !== undefined) dataToUpdate.hwid = updateData.hwid;
+      if (updateData.passcode !== undefined)
+        dataToUpdate.passcode = updateData.passcode;
+      if (updateData.employeeIds !== undefined)
+        dataToUpdate.employeeId = updateData.employeeIds;
 
-    if (!updated) {
-      const error = new Error("ไม่สามารถอัปเดตอุปกรณ์ได้");
-      error.statusCode = 500;
+      // อัปเดต
+      const updated = await DevicesModel.update(
+        deviceId,
+        companyId,
+        dataToUpdate
+      );
+
+      if (!updated) {
+        const error = new Error("ไม่สามารถอัปเดตอุปกรณ์ได้");
+        error.statusCode = 500;
+        throw error;
+      }
+
+      // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
+      await connection.commit();
+
+      return {
+        message: "อัปเดตอุปกรณ์สำเร็จ",
+        deviceId: deviceId,
+      };
+    } catch (error) {
+      // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
-
-    return {
-      message: "อัปเดตอุปกรณ์สำเร็จ",
-      deviceId: deviceId,
-    };
   }
 
   // ==================== Sync Methods ====================

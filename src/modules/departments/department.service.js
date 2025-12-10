@@ -46,6 +46,7 @@ class DepartmentService {
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       // สร้างแผนกใหม่
       return await DepartmentModel.create(companyId, departmentData);
     } catch (error) {
@@ -92,6 +93,7 @@ class DepartmentService {
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       // อัปเดตแผนก
       return await DepartmentModel.updateByIdAndCompanyId(
         departmentId,
@@ -127,6 +129,7 @@ class DepartmentService {
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       // ลบแผนก
       return await DepartmentModel.deleteByIdAndCompanyId(
         departmentId,

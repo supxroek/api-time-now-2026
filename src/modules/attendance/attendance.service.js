@@ -116,6 +116,7 @@ class AttendanceService {
       });
 
       await connection.commit();
+      connection.release();
 
       return {
         success: true,
@@ -204,6 +205,7 @@ class AttendanceService {
       }
 
       await connection.commit();
+      connection.release();
 
       // กำหนดข้อความตอบกลับ
       let message = "ออกงานสำเร็จ";
@@ -284,6 +286,7 @@ class AttendanceService {
       }
 
       await connection.commit();
+      connection.release();
 
       return {
         success: true,
@@ -343,6 +346,7 @@ class AttendanceService {
       }
 
       await connection.commit();
+      connection.release();
 
       return {
         success: true,

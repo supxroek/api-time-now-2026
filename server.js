@@ -16,7 +16,7 @@ const {
   PORT = 3000,
   CORS_ORIGIN = "*",
   BODY_LIMIT = "100kb",
-  RATE_LIMIT_WINDOW_MS = 60000,
+  RATE_LIMIT_WINDOW_MS,
   RATE_LIMIT_MAX = 100,
 } = process.env;
 

@@ -67,6 +67,7 @@ class RequestService {
       );
 
       await connection.commit();
+      connection.release();
       return newRequest;
     } catch (error) {
       await connection.rollback();
@@ -123,6 +124,7 @@ class RequestService {
       }
 
       await connection.commit();
+      connection.release();
       return {
         success: approved,
         message: approved
@@ -212,6 +214,7 @@ class RequestService {
       const rejected = await RequestModel.rejectRequest(requestId, companyId);
 
       await connection.commit();
+      connection.release();
       return {
         success: rejected,
         message: rejected ? "ปฏิเสธคำขอสำเร็จ" : "ไม่สามารถปฏิเสธคำขอได้",

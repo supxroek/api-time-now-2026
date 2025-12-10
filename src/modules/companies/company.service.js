@@ -39,6 +39,7 @@ class CompanyService {
       );
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       return updatedCompany;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด

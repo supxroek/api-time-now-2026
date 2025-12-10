@@ -150,6 +150,7 @@ class EmployeeService {
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       // สร้างพนักงานใหม่
       return await EmployeeModel.create(companyId, employeeData);
     } catch (error) {
@@ -195,6 +196,7 @@ class EmployeeService {
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       // อัปเดตพนักงาน
       return await EmployeeModel.updateByIdAndCompanyId(
         companyId,
@@ -245,6 +247,7 @@ class EmployeeService {
 
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       // อัพเดตพนักงาน
       return await EmployeeModel.resignByIdAndCompanyId(
         companyId,
@@ -751,6 +754,7 @@ class EmployeeService {
       }
 
       await connection.commit();
+      connection.release();
       return result;
     } catch (error) {
       await connection.rollback();

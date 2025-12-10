@@ -55,6 +55,7 @@ class OvertimeService {
 
       // commit transaction
       await connection.commit(); // กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
+      connection.release();
       return newOvertime;
     } catch (error) {
       // rollback transaction

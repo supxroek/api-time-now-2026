@@ -44,6 +44,7 @@ class AuthService {
       user.token = token;
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       return user;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
@@ -63,6 +64,7 @@ class AuthService {
       await authModel.updateLastLogin(userId);
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
       await connection.rollback();
@@ -86,6 +88,7 @@ class AuthService {
       const newUser = await authModel.createUser(email, password, role);
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       return newUser;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
@@ -121,6 +124,7 @@ class AuthService {
       await authModel.updateRefreshToken(payload.id, newToken, expiresAt);
       // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
       await connection.commit();
+      connection.release();
       return newToken;
     } catch (error) {
       // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
