@@ -284,6 +284,25 @@ class DevicesService {
     };
   }
 
+  // ==================== Delete Methods ====================
+
+  /**
+   * ลบอุปกรณ์
+   * @param {number} deviceId - รหัสอุปกรณ์
+   * @param {number} companyId - รหัสบริษัท
+   * @returns {Promise<boolean>} true ถ้าลบสำเร็จ
+   */
+  async deleteDevice(deviceId, companyId) {
+    const device = await DevicesModel.findById(deviceId, companyId);
+    if (!device) {
+      const error = new Error("ไม่พบอุปกรณ์");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return await DevicesModel.delete(deviceId, companyId);
+  }
+
   // ==================== Helper Methods ====================
 
   /**

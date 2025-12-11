@@ -36,6 +36,14 @@ router
     DevicesController.syncDevices
   )
 
+  // POST /api/devices/sync-trigger - สั่งซิงค์ข้อมูลอุปกรณ์ (สำหรับ CMS)
+  .post(
+    "/sync-trigger",
+    authenticate,
+    validate(devicesSchemas.triggerSync),
+    DevicesController.triggerSync
+  )
+
   // GET /api/devices/:id - ดึงข้อมูลอุปกรณ์ตาม ID
   .get("/:id", authenticate, DevicesController.getDeviceById)
 
@@ -45,6 +53,9 @@ router
     authenticate,
     validate(devicesSchemas.updateDevice),
     DevicesController.updateDevice
-  );
+  )
+
+  // DELETE /api/devices/:id - ลบอุปกรณ์
+  .delete("/:id", authenticate, DevicesController.deleteDevice);
 
 module.exports = router;

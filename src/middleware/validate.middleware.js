@@ -71,7 +71,10 @@ const companySchemas = {
 
   update: Joi.object({
     name: Joi.string().min(2).max(255),
-    branch: Joi.string().max(5).allow("", null),
+    branch: Joi.string().max(255).allow("", null),
+    tax_id: Joi.string().max(20).allow("", null),
+    employeeLimit: Joi.number().integer().min(1),
+    hasDepartment: Joi.number().integer().valid(0, 1),
     email: Joi.string().email().max(255).allow("", null),
     phoneNumber: Joi.string().max(255).allow("", null),
     contactPerson: Joi.string().max(255).allow("", null),
@@ -81,7 +84,7 @@ const companySchemas = {
     sub_district: Joi.string().max(255).allow("", null),
     postal_code: Joi.string().max(255).allow("", null),
     hr_name: Joi.string().max(255).allow("", null),
-    hr_email: Joi.string().email().max(255),
+    hr_email: Joi.string().email().max(255).allow("", null),
     report_date: Joi.number().integer().min(1).max(31),
   }).min(1), // ต้องมีอย่างน้อย 1 field
 };
@@ -260,6 +263,11 @@ const devicesSchemas = {
   syncDevice: Joi.object({
     hwid: Joi.string().min(1).max(45).required(), // Hardware ID
     passcode: Joi.string().min(1).max(45).required(), // รหัสผ่านอุปกรณ์
+  }),
+
+  // Trigger Sync validation (สำหรับ CMS)
+  triggerSync: Joi.object({
+    id: Joi.number().integer().positive().required(),
   }),
 };
 

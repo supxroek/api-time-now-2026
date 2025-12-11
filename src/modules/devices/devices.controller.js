@@ -111,6 +111,26 @@ class DevicesController {
   }
 
   /**
+   * DELETE /api/devices/:id
+   * ลบอุปกรณ์
+   */
+  async deleteDevice(req, res, next) {
+    try {
+      const companyId = req.user.company_id;
+      const deviceId = Number.parseInt(req.params.id);
+
+      await DevicesService.deleteDevice(deviceId, companyId);
+
+      res.status(200).json({
+        success: true,
+        message: "ลบอุปกรณ์สำเร็จ",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/devices/sync
    * ซิงค์ข้อมูลอุปกรณ์ (สำหรับเครื่อง Time Attendance)
    */
@@ -119,6 +139,33 @@ class DevicesController {
       const syncData = {
         hwid: req.body.hwid,
         passcode: req.body.passcode,
+      };
+
+      const result = await DevicesService.syncDevices(syncData);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/devices/sync-trigger
+   * สั่งซิงค์ข้อมูลอุปกรณ์ (สำหรับ CMS)
+   */
+  async triggerSync(req, res, next) {
+    try {
+      const companyId = req.user.company_id;
+      const deviceId = req.body.id;
+
+      // ดึงข้อมูลอุปกรณ์เพื่อเอา HWID/Passcode
+      const device = await DevicesService.getDeviceById(deviceId, companyId);
+      const syncData = {
+        hwid: device.hwid,
+        passcode: device.passcode,
       };
 
       const result = await DevicesService.syncDevices(syncData);

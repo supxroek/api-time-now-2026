@@ -14,14 +14,19 @@ class DepartmentModel {
   async create(companyId, departmentData) {
     const query =
       "INSERT INTO department (companyId, departmentName, headDep_email, headDep_name, headDep_tel) VALUES (?, ?, ?, ?, ?)";
-    const [result] = await pool.execute(query, [
-      companyId,
-      departmentData.departmentName,
-      departmentData.headDep_email,
-      departmentData.headDep_name,
-      departmentData.headDep_tel,
-    ]);
-    return { id: result.insertId, ...departmentData };
+    try {
+      const [result] = await pool.execute(query, [
+        companyId,
+        departmentData.departmentName,
+        departmentData.headDep_email || null,
+        departmentData.headDep_name || null,
+        departmentData.headDep_tel || null,
+      ]);
+      return { id: result.insertId, ...departmentData };
+    } catch (error) {
+      console.error("Model create error:", error);
+      throw error;
+    }
   }
 
   // ดึงข้อมูลแผนกตาม ID สำหรับบริษัทที่ระบุ

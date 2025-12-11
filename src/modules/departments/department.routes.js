@@ -21,7 +21,7 @@ router
   .get(
     "/", //สำหรับดึงข้อมูลแผนกทั้งหมด พร้อมจำนวนพนักงานในแต่ละแผนก
     authenticate, // ต้องผ่านการยืนยันตัวตน
-    validate(departmentSchemas.get),
+    validate(departmentSchemas.get, "query"),
     DepartmentController.getDepartments
   )
   .post(
