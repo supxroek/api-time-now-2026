@@ -40,6 +40,11 @@ router
     authenticate, // ตรวจสอบการยืนยันตัวตน
     validate(shiftsSchemas.assign), // ตรวจสอบความถูกต้องของข้อมูลที่ส่งมา
     ShiftController.assignShiftToEmployee // กำหนดกะการทำงานให้พนักงาน
+  )
+  .delete(
+    "/:id",
+    authenticate, // ตรวจสอบการยืนยันตัวตน
+    ShiftController.deleteShift // ลบกะการทำงาน
   );
 
 module.exports = router;

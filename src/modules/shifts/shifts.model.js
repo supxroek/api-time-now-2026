@@ -32,7 +32,7 @@ class ShiftModel {
       is_break = 1,
       break_start_time = null,
       break_end_time = null,
-      employeeId,
+      employeeId = null,
     } = shiftData;
 
     const query = `
@@ -94,6 +94,13 @@ class ShiftModel {
     const query = "SELECT * FROM workingTime WHERE id = ? AND companyId = ?";
     const [rows] = await pool.execute(query, [shiftId, companyId]);
     return rows[0];
+  }
+
+  // ลบกะการทำงาน
+  async delete(shiftId, companyId) {
+    const query = "DELETE FROM workingTime WHERE id = ? AND companyId = ?";
+    const [result] = await pool.execute(query, [shiftId, companyId]);
+    return result.affectedRows > 0;
   }
 }
 

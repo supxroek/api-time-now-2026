@@ -22,9 +22,6 @@ class ShiftService {
 
   // สร้างกะการทำงานใหม่
   async createShift(shiftData, companyId) {
-    // เริ่ม transaction
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
     try {
       // ตรวจสอบข้อมูลที่จำเป็น
       if (!companyId) {
@@ -64,24 +61,14 @@ class ShiftService {
       // สร้างกะการทำงานใหม่
       const newShift = await ShiftModel.create(shiftData, companyId);
 
-      // commit transaction
-      await connection.commit(); // กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      connection.release();
       return newShift;
     } catch (error) {
-      // rollback transaction
-      await connection.rollback(); // กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
       throw error;
-    } finally {
-      connection.release();
     }
   }
 
   // อัปเดตกะการทำงาน
   async updateShift(shiftId, shiftData, companyId) {
-    // เริ่ม transaction
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
     try {
       // ตรวจสอบข้อมูลที่จำเป็น
       if (!shiftId || !companyId) {
@@ -111,25 +98,15 @@ class ShiftService {
 
       await ShiftModel.update(shiftId, shiftData, companyId);
 
-      // commit transaction
-      await connection.commit();
-      connection.release();
-
       // ดึงข้อมูลที่อัปเดตแล้วกลับมา
       return await ShiftModel.findById(shiftId, companyId);
     } catch (error) {
-      await connection.rollback();
       throw error;
-    } finally {
-      connection.release();
     }
   }
 
   // มอบหมายกะการทำงานให้พนักงาน เช่น [employeeId1, employeeId2] ได้กะการทำงาน shiftId
   async assignShiftToEmployee(assignmentData, companyId) {
-    // เริ่ม transaction
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
     try {
       const { shiftId, employeeIds } = assignmentData;
       if (!shiftId || !employeeIds) {
@@ -158,17 +135,34 @@ class ShiftService {
         throw new Error("Failed to assign shift to employees");
       }
 
-      // commit transaction
-      await connection.commit();
-      connection.release();
-
       // ดึงข้อมูลที่อัปเดตแล้วกลับมา
       return await ShiftModel.findById(shiftId, companyId);
     } catch (error) {
-      await connection.rollback();
       throw error;
-    } finally {
-      connection.release();
+    }
+  }
+
+  // ลบกะการทำงาน
+  async deleteShift(shiftId, companyId) {
+    try {
+      if (!shiftId || !companyId) {
+        throw new Error("shiftId and companyId are required");
+      }
+
+      // ตรวจสอบว่า shift มีอยู่จริง
+      const shift = await ShiftModel.findById(shiftId, companyId);
+      if (!shift) {
+        throw new Error("Shift not found");
+      }
+
+      const deleted = await ShiftModel.delete(shiftId, companyId);
+      if (!deleted) {
+        throw new Error("Failed to delete shift");
+      }
+
+      return true;
+    } catch (error) {
+      throw error;
     }
   }
 }
