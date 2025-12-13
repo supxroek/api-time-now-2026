@@ -33,7 +33,6 @@ class AuthService {
       id: user.id,
       email: user.email,
       role: user.role,
-      employee_id: user.employee_id,
       company_id: user.company_id,
       is_active: user.is_active,
     });
@@ -102,7 +101,6 @@ class AuthService {
         id: payload.id,
         email: payload.email,
         role: payload.role,
-        employee_id: payload.employee_id,
         company_id: payload.company_id,
         is_active: payload.is_active,
       });
