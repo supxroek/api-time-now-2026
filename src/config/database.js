@@ -70,14 +70,14 @@ const createPool = () => {
     connectionLimit: Number.parseInt(DB_CONN_LIMIT || "10"),
   };
 
-  if (isProduction && INSTANCE_CONNECTION_NAME) {
-    // การตั้งค่าสำหรับ Production (Cloud Run via Socket)
-    console.log("🔵 Connecting to production database (Socket)...");
-    pool = mysql.createPool({
-      ...baseConfig,
-      socketPath: `/cloudsql/${INSTANCE_CONNECTION_NAME}`,
-    });
-  } else {
+  // if (isProduction && INSTANCE_CONNECTION_NAME) {
+  //   // การตั้งค่าสำหรับ Production (Cloud Run via Socket)
+  //   console.log("🔵 Connecting to production database (Socket)...");
+  //   pool = mysql.createPool({
+  //     ...baseConfig,
+  //     socketPath: `/cloudsql/${INSTANCE_CONNECTION_NAME}`,
+  //   });
+  // } else {
     // การตั้งค่าสำหรับ Development หรือ Production แบบ TCP
     console.log(
       `🔵 Connecting to database (TCP) at ${DB_HOST}:${DB_PORT || 3306}...`
@@ -88,7 +88,7 @@ const createPool = () => {
       port: DB_PORT ? Number.parseInt(DB_PORT) : 3306,
       ssl: loadSSLCert(),
     });
-  }
+  // }
 
   console.log("🟢 Database pool created.");
   return pool;
