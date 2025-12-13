@@ -12,7 +12,7 @@ const app = express();
 
 // กำหนดพอร์ตจาก environment variable หรือใช้ค่าเริ่มต้น 3000
 const {
-  NODE_ENV,
+  NODE_ENV = "development",
   PORT = 3000,
   CORS_ORIGIN = "*",
   BODY_LIMIT = "10mb",
@@ -21,45 +21,63 @@ const {
   TRUST_PROXY = "true",
 } = process.env;
 
-// ตั้งค่า trust proxy เพื่อให้ express-rate-limit สามารถใช้ X-Forwarded-For เมื่อแอปทำงานหลังพร็อกซี
-// เปิดใช้งานเมื่อตัวแปร ENV TRUST_PROXY ถูกตั้งเป็น "true" หรือเมื่อรันใน production
-if (
-  (TRUST_PROXY && String(TRUST_PROXY).toLowerCase() === "true") ||
-  NODE_ENV === "production"
-) {
-  // 1 หมายถึง เชื่อถือ proxy ชั้นบนสุด (common for PaaS like Render/Heroku)
-  app.set("trust proxy", 1);
+// รวมการตั้งค่าสำหรับ Development และ Production ทั้งหมดไว้ตรงนี้
+const isProduction = NODE_ENV === "production";
+const config = {
+  env: NODE_ENV,
+  port: Number(PORT),
+  isProduction,
+  corsOrigin: CORS_ORIGIN,
+  bodyLimit: BODY_LIMIT,
+  trustProxy:
+    (TRUST_PROXY && String(TRUST_PROXY).toLowerCase() === "true") ||
+    isProduction
+      ? 1
+      : 0,
+  rateLimit: {
+    // ถ้าไม่ได้กำหนด RATE_LIMIT_WINDOW_MS ให้ใช้ค่าเริ่มต้น 15 นาที
+    windowMin: Math.max(1, Number.parseInt(RATE_LIMIT_WINDOW_MS || "15", 10)),
+    max: Number.parseInt(RATE_LIMIT_MAX || "100", 10),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: "Too many requests, please try again later.",
+  },
+};
+
+// ตั้งค่า trust proxy (ใช้เมื่อทำงานหลัง proxy หรือเมื่อรัน production)
+if (config.trustProxy) {
+  app.set("trust proxy", config.trustProxy);
 }
 
-// เพิ่ม log ใน health check
+// เพิ่ม log ใน health check (อ้างอิงค่าจาก config กลาง)
 app.get("/debug", (req, res) => {
   res.json({
     ip: req.ip,
     headers: req.headers["x-forwarded-for"],
     trustProxy: app.get("trust proxy"),
-    bodyLimit: BODY_LIMIT,
+    bodyLimit: config.bodyLimit,
   });
 });
 
-// กำหนดตัวเลือก CORS
-const corsOptions =
-  CORS_ORIGIN === "*"
+// กำหนดตัวเลือก CORS (จาก config กลาง)
+config.corsOptions =
+  config.corsOrigin === "*"
     ? { origin: true }
-    : { origin: CORS_ORIGIN.split(",").map((s) => s.trim()) };
+    : { origin: config.corsOrigin.split(",").map((s) => s.trim()) };
 
-// ตั้งค่า rate limiting
+// ตั้งค่า rate limiting (จาก config กลาง)
 const limiter = rateLimit({
-  windowMs: Math.max(1, Number.parseInt(RATE_LIMIT_WINDOW_MS, 10)) * 60 * 1000,
-  max: Number.parseInt(RATE_LIMIT_MAX, 10),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: "Too many requests, please try again later.",
+  windowMs: config.rateLimit.windowMin * 60 * 1000,
+  max: config.rateLimit.max,
+  standardHeaders: config.rateLimit.standardHeaders,
+  legacyHeaders: config.rateLimit.legacyHeaders,
+  message: config.rateLimit.message,
 });
 
 // ตั้งค่า middleware
 app
   .use(helmet())
-  .use(morgan("dev")) // ได้แก่ combined, common, dev, short, tiny
+  .use(morgan(NODE_ENV === "production" ? "combined" : "dev"))
   .use(cors({ origin: corsOptions }))
   .use(express.json({ limit: BODY_LIMIT }))
   .use(express.urlencoded({ extended: false, limit: BODY_LIMIT }))
