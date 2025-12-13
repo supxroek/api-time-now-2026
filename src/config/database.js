@@ -61,42 +61,36 @@ function loadSSLCert() {
 // กำหนดการตั้งค่าการเชื่อมต่อฐานข้อมูล
 const createPool = () => {
   let pool;
-  if (isProduction) {
-    // การตั้งค่าสำหรับ Production (Cloud Run)
-    const socketPath = INSTANCE_CONNECTION_NAME
-      ? `/cloudsql/${INSTANCE_CONNECTION_NAME}`
-      : undefined;
 
-    // การตั้งค่าการเชื่อมต่อผ่าน UNIX socket
-    const prodConfig = {
-      user: DB_USER,
-      password: DB_PASS,
-      database: DB_NAME,
-      connectionLimit: Number.parseInt(DB_CONN_LIMIT),
-      socketPath,
-    };
+  // Common config
+  const baseConfig = {
+    user: DB_USER,
+    password: DB_PASS,
+    database: DB_NAME,
+    connectionLimit: Number.parseInt(DB_CONN_LIMIT || "10"),
+  };
 
-    // สร้างการเชื่อมต่อพูล
-    console.log("🔵 Connecting to production database...");
-    pool = mysql.createPool(prodConfig);
-    console.log("🟢 Connected to production database.");
+  if (isProduction && INSTANCE_CONNECTION_NAME) {
+    // การตั้งค่าสำหรับ Production (Cloud Run via Socket)
+    console.log("🔵 Connecting to production database (Socket)...");
+    pool = mysql.createPool({
+      ...baseConfig,
+      socketPath: `/cloudsql/${INSTANCE_CONNECTION_NAME}`,
+    });
   } else {
-    // การตั้งค่าสำหรับ Development (TCP connection)
-    const devConfig = {
+    // การตั้งค่าสำหรับ Development หรือ Production แบบ TCP
+    console.log(
+      `🔵 Connecting to database (TCP) at ${DB_HOST}:${DB_PORT || 3306}...`
+    );
+    pool = mysql.createPool({
+      ...baseConfig,
       host: DB_HOST,
       port: DB_PORT ? Number.parseInt(DB_PORT) : 3306,
-      user: DB_USER,
-      password: DB_PASS,
-      database: DB_NAME,
-      connectionLimit: Number.parseInt(DB_CONN_LIMIT),
       ssl: loadSSLCert(),
-    };
-
-    // สร้างการเชื่อมต่อพูล
-    console.log("🔵 Connecting to development database...");
-    pool = mysql.createPool(devConfig);
-    console.log("🟢 Connected to development database.");
+    });
   }
+
+  console.log("🟢 Database pool created.");
   return pool;
 };
 
@@ -122,10 +116,10 @@ const testPool = () => {
 };
 
 // สร้างพูลการเชื่อมต่อ สำหรับแอปหลัก
-// const pool = createPool();
+const pool = createPool();
 
 // สร้างพูลการเชื่อมต่อ สำหรับการทดสอบ
-const pool = testPool();
+// const pool = testPool();
 
 // ส่งออกพูลการเชื่อมต่อ
 module.exports = pool;
