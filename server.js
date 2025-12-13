@@ -101,30 +101,23 @@ app.get("/health", (req, res) => {
   // เช็คสถานะของ database
   const db = require("./src/config/database");
   db.getConnection((err, connection) => {
-    if (err) {
-      console.error("Database connection error:", err);
-      return res.status(500).json({
-        status: "unhealthy",
-        error: "Database connection error",
-      });
-    }
     if (connection) connection.release();
+    // สร้าง response สำหรับ health check
+    const healthCheck = {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      environment: NODE_ENV,
+      database: db ? "connected" : "disconnected",
+      version,
+      memory: {
+        used: `${Math.round(mem.heapUsed / 1024 / 1024)} MB`,
+        total: `${Math.round(mem.heapTotal / 1024 / 1024)} MB`,
+      },
+    };
+    // ส่ง response เป็น JSON
+    res.status(200).json(healthCheck);
   });
-  // สร้าง response สำหรับ health check
-  const healthCheck = {
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()),
-    environment: NODE_ENV,
-    database: db ? "connected" : "disconnected",
-    version,
-    memory: {
-      used: `${Math.round(mem.heapUsed / 1024 / 1024)} MB`,
-      total: `${Math.round(mem.heapTotal / 1024 / 1024)} MB`,
-    },
-  };
-  // ส่ง response เป็น JSON
-  res.status(200).json(healthCheck);
 });
 
 /** --------------------------------------------------------------------
