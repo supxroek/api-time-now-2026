@@ -72,26 +72,35 @@ class DepartmentService {
     if (!companyId) {
       throw new Error("companyId is required");
     }
+
+    // Ensure departmentId is a number for comparison
+    const idToUpdate = Number(departmentId);
+
     // ป้องกันชื่อแผนกซ้ำกันเมื่ออัปเดต
-    const existingDepartments = await DepartmentModel.findAllByCompanyId(
-      companyId
-    );
-    const isDuplicate = existingDepartments.some(
-      (dept) =>
-        dept.departmentName === updateData.departmentName &&
-        dept.id !== departmentId
-    );
-    if (isDuplicate) {
-      throw new Error(
-        `Department name:${updateData.departmentName} already exists within the company`
+    if (updateData.departmentName) {
+      const existingDepartments = await DepartmentModel.findAllByCompanyId(
+        companyId
       );
+      const isDuplicate = existingDepartments.some(
+        (dept) =>
+          dept.departmentName === updateData.departmentName &&
+          dept.id !== idToUpdate
+      );
+      if (isDuplicate) {
+        throw new Error(
+          `Department name:${updateData.departmentName} already exists within the company`
+        );
+      }
     }
+
+    // Remove id from updateData to prevent updating primary key
+    const { id, ...dataToUpdate } = updateData;
 
     // อัปเดตแผนก
     return await DepartmentModel.updateByIdAndCompanyId(
       departmentId,
       companyId,
-      updateData
+      dataToUpdate
     );
   }
 
