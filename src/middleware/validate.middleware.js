@@ -305,6 +305,31 @@ const overtimeSchemas = {
         return value;
       }),
   }),
+
+  update: Joi.object({
+    overTimeName: Joi.string().min(2).max(255),
+    ot_start_time: Joi.string()
+      .pattern(/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+      .messages({
+        "string.pattern.base":
+          "ot_start_time must be in HH:mm or HH:mm:ss format",
+      }),
+    ot_end_time: Joi.string()
+      .pattern(/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+      .messages({
+        "string.pattern.base":
+          "ot_end_time must be in HH:mm or HH:mm:ss format",
+      }),
+    employeeId: Joi.alternatives()
+      .try(Joi.string(), Joi.array().items(Joi.number().integer()))
+      .custom((value) => {
+        // แปลงเป็น JSON string ถ้าเป็น array
+        if (Array.isArray(value)) {
+          return JSON.stringify(value);
+        }
+        return value;
+      }),
+  }).min(1),
 };
 
 // ========================================

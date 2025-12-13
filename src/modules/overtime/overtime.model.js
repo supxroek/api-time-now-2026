@@ -30,6 +30,26 @@ class OvertimeModel {
     );
     return rows[0];
   }
+
+  // อัปเดตข้อมูลชั่วโมงทำงานล่วงเวลา
+  async update(id, overtimeData, companyId) {
+    const { overTimeName, ot_start_time, ot_end_time, employeeId } =
+      overtimeData;
+    await pool.query(
+      "UPDATE overtime SET overTimeName = ?, ot_start_time = ?, ot_end_time = ?, employeeId = ? WHERE id = ? AND companyId = ?",
+      [overTimeName, ot_start_time, ot_end_time, employeeId, id, companyId]
+    );
+    return { id, ...overtimeData, companyId };
+  }
+
+  // ลบข้อมูลชั่วโมงทำงานล่วงเวลา
+  async delete(id, companyId) {
+    const [result] = await pool.query(
+      "DELETE FROM overtime WHERE id = ? AND companyId = ?",
+      [id, companyId]
+    );
+    return result.affectedRows > 0;
+  }
 }
 
 module.exports = new OvertimeModel();

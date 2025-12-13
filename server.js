@@ -18,7 +18,18 @@ const {
   BODY_LIMIT = "100kb",
   RATE_LIMIT_WINDOW_MS,
   RATE_LIMIT_MAX = 100,
+  TRUST_PROXY = "true",
 } = process.env;
+
+// ตั้งค่า trust proxy เพื่อให้ express-rate-limit สามารถใช้ X-Forwarded-For เมื่อแอปทำงานหลังพร็อกซี
+// เปิดใช้งานเมื่อตัวแปร ENV TRUST_PROXY ถูกตั้งเป็น "true" หรือเมื่อรันใน production
+if (
+  (TRUST_PROXY && String(TRUST_PROXY).toLowerCase() === "true") ||
+  NODE_ENV === "production"
+) {
+  // 1 หมายถึง เชื่อถือ proxy ชั้นบนสุด (common for PaaS like Render/Heroku)
+  app.set("trust proxy", 1);
+}
 
 // กำหนดตัวเลือก CORS
 const corsOptions =

@@ -65,6 +65,26 @@ class OvertimeService {
       connection.release();
     }
   }
+
+  // อัปเดตชั่วโมงทำงานล่วงเวลา
+  async updateOvertime(id, overtimeData, companyId) {
+    // แปลงเวลาเริ่มต้นและเวลาสิ้นสุดเป็นรูปแบบ TIME (HH:mm:ss)
+    if (overtimeData.ot_start_time) {
+      overtimeData.ot_start_time = DateUtil.toDbTime(
+        overtimeData.ot_start_time
+      );
+    }
+    if (overtimeData.ot_end_time) {
+      overtimeData.ot_end_time = DateUtil.toDbTime(overtimeData.ot_end_time);
+    }
+
+    return await OvertimeModel.update(id, overtimeData, companyId);
+  }
+
+  // ลบชั่วโมงทำงานล่วงเวลา
+  async deleteOvertime(id, companyId) {
+    return await OvertimeModel.delete(id, companyId);
+  }
 }
 
 module.exports = new OvertimeService();

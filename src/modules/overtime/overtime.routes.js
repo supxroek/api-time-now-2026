@@ -28,6 +28,13 @@ router
     authenticate, // ตรวจสอบการยืนยันตัวตน
     validate(overtimeSchemas.create, "body"), // ตรวจสอบความถูกต้องของข้อมูล
     OvertimeController.createOvertime
-  );
+  )
+  .put(
+    "/:id",
+    authenticate,
+    validate(overtimeSchemas.update, "body"),
+    OvertimeController.updateOvertime
+  )
+  .delete("/:id", authenticate, OvertimeController.deleteOvertime);
 
 module.exports = router;
