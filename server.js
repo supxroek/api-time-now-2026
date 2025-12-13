@@ -78,9 +78,9 @@ const limiter = rateLimit({
 app
   .use(helmet())
   .use(morgan(NODE_ENV === "production" ? "combined" : "dev"))
-  .use(cors({ origin: corsOptions }))
-  .use(express.json({ limit: BODY_LIMIT }))
-  .use(express.urlencoded({ extended: false, limit: BODY_LIMIT }))
+  .use(cors({ origin: config.corsOptions }))
+  .use(express.json({ limit: config.bodyLimit }))
+  .use(express.urlencoded({ extended: false, limit: config.bodyLimit }))
   .use(limiter);
 
 /** --------------------------------------------------------------------
@@ -140,9 +140,9 @@ app
 /** --------------------------------------------------------------------
  * เริ่มต้นเซิร์ฟเวอร์
  */
-const server = app.listen(PORT);
+const server = app.listen(config.port);
 // กำหนด base URL
-const baseUrl = `http://localhost:${PORT}`;
+const baseUrl = `http://localhost:${config.port}`;
 // แสดงข้อความเมื่อเซิร์ฟเวอร์เริ่มทำงาน
 server.on("listening", () => {
   console.log(`🚀 Server running in ${NODE_ENV} mode`);
