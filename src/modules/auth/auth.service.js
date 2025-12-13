@@ -38,7 +38,7 @@ class AuthService {
       is_active: user.is_active,
     });
     user.token = token;
-    
+
     return user;
   }
 

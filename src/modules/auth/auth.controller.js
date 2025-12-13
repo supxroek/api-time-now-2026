@@ -14,7 +14,10 @@ class AuthController {
   async login(req, res) {
     console.log("Login body:", req.body);
     console.log("Content-Type:", req.headers["content-type"]);
-    console.log("Raw body:", req.rawBody ? req.rawBody.toString() : "No raw body");
+    console.log(
+      "Raw body:",
+      req.rawBody ? req.rawBody.toString() : "No raw body"
+    );
     try {
       const { email, password } = req.body;
       const user = await authService.login(email, password);
