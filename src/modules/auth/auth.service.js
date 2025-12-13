@@ -18,40 +18,28 @@ const { JWT_EXPIRES_IN = "1h" } = process.env;
 class AuthService {
   // business logic for user login
   async login(email, password) {
-    // เริ่ม transaction
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-    try {
-      // ตรวจสอบผู้ใช้และรหัสผ่าน
-      const user = await authModel.findUserByEmail(email);
-      if (!user) {
-        throw new Error("Invalid email or password");
-      }
-      const isPasswordValid = await authModel.verifyPassword(user, password);
-      if (!isPasswordValid) {
-        throw new Error("Invalid email or password");
-      }
-
-      // สร้าง token
-      const token = JWT.generateToken({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        employee_id: user.employee_id,
-        company_id: user.company_id,
-        is_active: user.is_active,
-      });
-      user.token = token;
-      // commit transaction - กรณีสำเร็จ:บันทึกข้อมูลลงฐานข้อมูล
-      await connection.commit();
-      connection.release();
-      return user;
-    } catch (error) {
-      // rollback transaction - กรณีเกิดข้อผิดพลาด: ยกเลิกการเปลี่ยนแปลงทั้งหมด
-      await connection.rollback();
-      connection.release();
-      throw error;
+    // ตรวจสอบผู้ใช้และรหัสผ่าน
+    const user = await authModel.findUserByEmail(email);
+    if (!user) {
+      throw new Error("Invalid email or password");
     }
+    const isPasswordValid = await authModel.verifyPassword(user, password);
+    if (!isPasswordValid) {
+      throw new Error("Invalid email or password");
+    }
+
+    // สร้าง token
+    const token = JWT.generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      employee_id: user.employee_id,
+      company_id: user.company_id,
+      is_active: user.is_active,
+    });
+    user.token = token;
+    
+    return user;
   }
 
   // บันทึกการเข้าสู่ระบบ (optional)

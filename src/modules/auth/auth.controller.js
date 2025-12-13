@@ -29,6 +29,7 @@ class AuthController {
         data: result,
       });
     } catch (error) {
+      console.error("Login error:", error); // Log the full error
       res.status(400).json({
         success: false,
         error: error.message,
