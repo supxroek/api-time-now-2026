@@ -14,6 +14,7 @@ const Joi = require("joi");
  */
 const validate = (schema, property = "body") => {
   return (req, res, next) => {
+    console.log("[validate] path:", req.path, "body:", req[property]); // เพิ่มบรรทัดนี้
     // ดำเนินการ validate
     const { error, value } = schema.validate(req[property], {
       abortEarly: false, // แสดง error ทั้งหมด ไม่หยุดที่ error แรก
