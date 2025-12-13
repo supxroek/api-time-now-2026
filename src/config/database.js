@@ -38,15 +38,9 @@ const {
 
 // ฟังก์ชันช่วยเหลือในการโหลด SSL certs
 function loadSSLCert() {
-  const ca = DB_SSL_CA_PATH
-    ? fs.readFileSync(DB_SSL_CA_PATH, "utf8")
-    : DB_SSL_CA;
-  const cert = DB_SSL_CERT_PATH
-    ? fs.readFileSync(DB_SSL_CERT_PATH, "utf8")
-    : DB_SSL_CERT;
-  const key = DB_SSL_KEY_PATH
-    ? fs.readFileSync(DB_SSL_KEY_PATH, "utf8")
-    : DB_SSL_KEY;
+  const ca = DB_SSL_CA || fs.readFileSync(DB_SSL_CA_PATH, "utf8");
+  const cert = DB_SSL_CERT || fs.readFileSync(DB_SSL_CERT_PATH, "utf8");
+  const key = DB_SSL_KEY || fs.readFileSync(DB_SSL_KEY_PATH, "utf8");
 
   // สร้างอ็อบเจ็กต์ SSL ถ้ามีข้อมูล
   const ssl = {};
@@ -78,16 +72,16 @@ const createPool = () => {
   //     socketPath: `/cloudsql/${INSTANCE_CONNECTION_NAME}`,
   //   });
   // } else {
-    // การตั้งค่าสำหรับ Development หรือ Production แบบ TCP
-    console.log(
-      `🔵 Connecting to database (TCP) at ${DB_HOST}:${DB_PORT || 3306}...`
-    );
-    pool = mysql.createPool({
-      ...baseConfig,
-      host: DB_HOST,
-      port: DB_PORT ? Number.parseInt(DB_PORT) : 3306,
-      ssl: loadSSLCert(),
-    });
+  // การตั้งค่าสำหรับ Development หรือ Production แบบ TCP
+  console.log(
+    `🔵 Connecting to database (TCP) at ${DB_HOST}:${DB_PORT || 3306}...`
+  );
+  pool = mysql.createPool({
+    ...baseConfig,
+    host: DB_HOST,
+    port: DB_PORT ? Number.parseInt(DB_PORT) : 3306,
+    ssl: loadSSLCert(),
+  });
   // }
 
   console.log("🟢 Database pool created.");
