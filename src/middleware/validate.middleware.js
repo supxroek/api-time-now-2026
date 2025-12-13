@@ -396,6 +396,7 @@ const shiftsSchemas = {
 const requestSchemas = {
   // สร้างคำขอลืมบันทึกเวลา
   forgetTime: Joi.object({
+    employeeId: Joi.number().integer().positive().required(),
     timestamp_type: Joi.string()
       .valid("work_in", "break_in", "ot_in", "work_out", "break_out", "ot_out")
       .required()
@@ -418,6 +419,11 @@ const requestSchemas = {
   // Validate id param
   idParam: Joi.object({
     id: Joi.number().integer().positive().required(),
+  }),
+
+  // Validate request_id param (string)
+  requestIdParam: Joi.object({
+    id: Joi.string().required(),
   }),
 };
 

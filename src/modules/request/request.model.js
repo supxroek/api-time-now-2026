@@ -71,9 +71,15 @@ class RequestModel {
   /**
    * สร้างคำขอลืมบันทึกเวลา
    */
-  async createForgetTimeRequest(employeeId, companyId, requestData) {
-    const { timestamp_type, forget_date, forget_time, reason, evidence } =
-      requestData;
+  async createForgetTimeRequest(companyId, requestData) {
+    const {
+      employeeId,
+      timestamp_type,
+      forget_date,
+      forget_time,
+      reason,
+      evidence,
+    } = requestData;
     const request_id = this._generateRequestId();
 
     const query = `
@@ -130,6 +136,138 @@ class RequestModel {
   }
 
   /**
+   * ค้นหาประวัติคำขอ (Approved/Rejected) พร้อมตัวกรอง
+   */
+  async findRequestHistory(companyId, filters = {}) {
+    let query = `
+      SELECT 
+        r.id, r.request_id, r.employee_id, r.company_id,
+        r.timestamp_type, r.forget_date, r.forget_time,
+        r.reason, r.evidence, r.status,
+        r.created_at, r.approved_at,
+        e.name as employee_name,
+        d.departmentName as department_name
+      FROM forget_timestamp_requests r
+      LEFT JOIN employees e ON r.employee_id = e.id
+      LEFT JOIN department d ON e.departmentId = d.id
+      WHERE r.company_id = ? AND r.status IN ('approved', 'rejected')`;
+
+    const params = [Number.parseInt(companyId)];
+
+    if (filters.startDate) {
+      query += ` AND DATE(r.created_at) >= ?`;
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      query += ` AND DATE(r.created_at) <= ?`;
+      params.push(filters.endDate);
+    }
+
+    if (filters.status && filters.status !== "all") {
+      query += ` AND r.status = ?`;
+      params.push(filters.status);
+    }
+
+    if (filters.type && filters.type !== "all") {
+      query += ` AND r.timestamp_type = ?`;
+      params.push(filters.type);
+    }
+
+    if (filters.search) {
+      query += ` AND (e.name LIKE ? OR r.request_id LIKE ?)`;
+      params.push(`%${filters.search}%`, `%${filters.search}%`);
+    }
+
+    query += ` ORDER BY r.created_at DESC`;
+
+    // Safe pagination
+    let limit = 10;
+    let offset = 0;
+
+    if (filters.limit) {
+      const parsedLimit = Number.parseInt(filters.limit, 10);
+      if (!Number.isNaN(parsedLimit) && parsedLimit > 0) limit = parsedLimit;
+    }
+
+    if (filters.page) {
+      const parsedPage = Number.parseInt(filters.page, 10);
+      if (!Number.isNaN(parsedPage) && parsedPage > 0) {
+        offset = (parsedPage - 1) * limit;
+      }
+    }
+
+    query += ` LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    const [rows] = await pool.query(query, params);
+    return rows;
+  }
+
+  /**
+   * นับจำนวนประวัติคำขอสำหรับ Pagination
+   */
+  async countRequestHistory(companyId, filters = {}) {
+    let query = `
+      SELECT COUNT(*) as total
+      FROM forget_timestamp_requests r
+      LEFT JOIN employees e ON r.employee_id = e.id
+      WHERE r.company_id = ? AND r.status IN ('approved', 'rejected')`;
+
+    const params = [Number.parseInt(companyId)];
+
+    if (filters.startDate) {
+      query += ` AND DATE(r.created_at) >= ?`;
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      query += ` AND DATE(r.created_at) <= ?`;
+      params.push(filters.endDate);
+    }
+
+    if (filters.status && filters.status !== "all") {
+      query += ` AND r.status = ?`;
+      params.push(filters.status);
+    }
+
+    if (filters.type && filters.type !== "all") {
+      query += ` AND r.timestamp_type = ?`;
+      params.push(filters.type);
+    }
+
+    if (filters.search) {
+      query += ` AND (e.name LIKE ? OR r.request_id LIKE ?)`;
+      params.push(`%${filters.search}%`, `%${filters.search}%`);
+    }
+
+    const [rows] = await pool.query(query, params);
+    return rows[0].total;
+  }
+
+  /**
+   * ดึงสถิติคำขอ (Pending, Approved, Rejected, Total History)
+   */
+  async getRequestStats(companyId) {
+    const query = `
+      SELECT 
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
+        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+        COUNT(*) as total
+      FROM forget_timestamp_requests
+      WHERE company_id = ?`;
+
+    const [rows] = await pool.execute(query, [Number.parseInt(companyId)]);
+    return {
+      pending: Number.parseInt(rows[0].pending || 0),
+      approved: Number.parseInt(rows[0].approved || 0),
+      rejected: Number.parseInt(rows[0].rejected || 0),
+      total: Number.parseInt(rows[0].total || 0),
+    };
+  }
+
+  /**
    * ค้นหาคำขอตาม ID
    */
   async findById(requestId, companyId) {
@@ -141,25 +279,36 @@ class RequestModel {
   }
 
   /**
-   * อนุมัติคำขอตาม ID
+   * ค้นหาคำขอตาม Request ID (String)
+   */
+  async findByRequestId(requestId, companyId) {
+    const query = `
+      SELECT * FROM forget_timestamp_requests 
+      WHERE request_id = ? AND company_id = ?`;
+    const [rows] = await pool.execute(query, [requestId, companyId]);
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * อนุมัติคำขอตาม Request ID
    */
   async approveRequest(requestId, companyId) {
     const query = `
       UPDATE forget_timestamp_requests 
       SET status = 'approved', approved_at = NOW()
-      WHERE id = ? AND company_id = ? AND status = 'pending'`;
+      WHERE request_id = ? AND company_id = ? AND status = 'pending'`;
     const [result] = await pool.execute(query, [requestId, companyId]);
     return result.affectedRows > 0;
   }
 
   /**
-   * ปฏิเสธคำขอตาม ID
+   * ปฏิเสธคำขอตาม Request ID
    */
   async rejectRequest(requestId, companyId) {
     const query = `
       UPDATE forget_timestamp_requests 
       SET status = 'rejected', approved_at = NOW()
-      WHERE id = ? AND company_id = ? AND status = 'pending'`;
+      WHERE request_id = ? AND company_id = ? AND status = 'pending'`;
     const [result] = await pool.execute(query, [requestId, companyId]);
     return result.affectedRows > 0;
   }
@@ -191,6 +340,14 @@ class RequestModel {
     forgetDate,
     workingTimeId
   ) {
+    // Ensure forgetDate is in YYYY-MM-DD format
+    let formattedDate = forgetDate;
+    if (forgetDate instanceof Date) {
+      formattedDate = forgetDate.toISOString().split("T")[0];
+    } else if (typeof forgetDate === "string" && forgetDate.includes("T")) {
+      formattedDate = forgetDate.split("T")[0];
+    }
+
     const query = `
       INSERT INTO timestamp_records (employeeid, companyId, workingTimeId, created_at)
       VALUES (?, ?, ?, ?)`;
@@ -198,7 +355,7 @@ class RequestModel {
       employeeId,
       companyId,
       workingTimeId || 0,
-      `${forgetDate} 00:00:00`,
+      `${formattedDate} 00:00:00`,
     ]);
     return result.insertId;
   }

@@ -44,11 +44,25 @@ router
     RequestController.getPendingRequests
   )
 
+  // GET /api/requests/history - ดึงประวัติคำขอ
+  .get(
+    "/history",
+    authenticate, // ต้องยืนยันตัวตน
+    RequestController.getRequestHistory
+  )
+
+  // GET /api/requests/stats - ดึงสถิติคำขอ
+  .get(
+    "/stats",
+    authenticate, // ต้องยืนยันตัวตน
+    RequestController.getRequestStats
+  )
+
   // PATCH /api/requests/:id/approve - อนุมัติคำขอตาม ID
   .patch(
     "/:id/approve",
     authenticate, // ต้องยืนยันตัวตน
-    validate(requestSchemas.idParam),
+    validate(requestSchemas.requestIdParam, "params"),
     RequestController.approveRequest
   )
 
@@ -56,7 +70,7 @@ router
   .patch(
     "/:id/reject",
     authenticate, // ต้องยืนยันตัวตน
-    validate(requestSchemas.idParam),
+    validate(requestSchemas.requestIdParam, "params"),
     RequestController.rejectRequest
   );
 

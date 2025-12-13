@@ -17,7 +17,7 @@ class AttendanceController {
    */
   async checkIn(req, res, next) {
     try {
-      const employeeId = req.user?.employee_id;
+      const employeeId = req.body.employee_id;
 
       if (!employeeId) {
         return res.status(401).json({

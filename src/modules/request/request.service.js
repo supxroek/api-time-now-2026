@@ -27,14 +27,10 @@ class RequestService {
   /**
    * สร้างคำขอลืมบันทึกเวลา
    */
-  async createForgetTimeRequest(employeeId, companyId, requestData) {
+  async createForgetTimeRequest(companyId, requestData) {
     const connection = await pool.getConnection();
     await connection.beginTransaction();
     try {
-      if (!employeeId || !companyId || !requestData) {
-        throw new Error("employeeId, companyId and requestData are required");
-      }
-
       // แปลง forget_date เป็น format ที่ถูกต้อง
       if (requestData.forget_date) {
         requestData.forget_date = DateUtil.toDbDate(requestData.forget_date);
@@ -47,7 +43,7 @@ class RequestService {
 
       // ตรวจสอบคำขอซ้ำกัน (สถานะ pending)
       const isDuplicate = await RequestModel.checkDuplicateRequest(
-        employeeId,
+        requestData.employeeId,
         companyId,
         requestData.timestamp_type,
         requestData.forget_date,
@@ -61,7 +57,6 @@ class RequestService {
       }
 
       const newRequest = await RequestModel.createForgetTimeRequest(
-        employeeId,
         companyId,
         requestData
       );
@@ -90,6 +85,34 @@ class RequestService {
   }
 
   /**
+   * ดึงประวัติคำขอ (Approved/Rejected)
+   */
+  async getRequestHistory(companyId, filters) {
+    if (!companyId) {
+      throw new Error("companyId is required");
+    }
+    const items = await RequestModel.findRequestHistory(companyId, filters);
+    const total = await RequestModel.countRequestHistory(companyId, filters);
+    return {
+      items,
+      total,
+      page: Number.parseInt(filters.page) || 1,
+      limit: Number.parseInt(filters.limit) || 10,
+      totalPages: Math.ceil(total / (Number.parseInt(filters.limit) || 10)),
+    };
+  }
+
+  /**
+   * ดึงสถิติคำขอ
+   */
+  async getRequestStats(companyId) {
+    if (!companyId) {
+      throw new Error("companyId is required");
+    }
+    return await RequestModel.getRequestStats(companyId);
+  }
+
+  /**
    * อนุมัติคำขอตาม ID
    * - อัปเดตสถานะคำขอเป็น approved
    * - อัปเดต timestamp_records ตามประเภทคำขอ
@@ -103,7 +126,7 @@ class RequestService {
       }
 
       // ตรวจสอบว่าคำขอมีอยู่และยังเป็น pending
-      const request = await RequestModel.findById(requestId, companyId);
+      const request = await RequestModel.findByRequestId(requestId, companyId);
       if (!request) {
         const error = new Error("ไม่พบคำขอ");
         error.statusCode = 404;
@@ -199,7 +222,7 @@ class RequestService {
       }
 
       // ตรวจสอบว่าคำขอมีอยู่และยังเป็น pending
-      const request = await RequestModel.findById(requestId, companyId);
+      const request = await RequestModel.findByRequestId(requestId, companyId);
       if (!request) {
         const error = new Error("ไม่พบคำขอ");
         error.statusCode = 404;

@@ -39,11 +39,9 @@ class RequestController {
   async createForgetTimeRequest(req, res, next) {
     try {
       const companyId = req.user.company_id;
-      const employeeId = req.user.employee_id;
       const requestData = req.body;
 
       const result = await RequestService.createForgetTimeRequest(
-        employeeId,
         companyId,
         requestData
       );
@@ -78,13 +76,51 @@ class RequestController {
   }
 
   /**
+   * GET /api/requests/history
+   * ดึงประวัติคำขอ (Approved/Rejected)
+   */
+  async getRequestHistory(req, res, next) {
+    try {
+      const companyId = req.user.company_id;
+      const filters = req.query;
+
+      const result = await RequestService.getRequestHistory(companyId, filters);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/requests/stats
+   * ดึงสถิติคำขอ
+   */
+  async getRequestStats(req, res, next) {
+    try {
+      const companyId = req.user.company_id;
+      const result = await RequestService.getRequestStats(companyId);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * PATCH /api/requests/:id/approve
    * อนุมัติคำขอตาม ID
    */
   async approveRequest(req, res, next) {
     try {
       const companyId = req.user.company_id;
-      const requestId = Number.parseInt(req.params.id);
+      const requestId = req.params.id; // Use string ID
 
       const result = await RequestService.approveRequest(requestId, companyId);
 
@@ -104,7 +140,7 @@ class RequestController {
   async rejectRequest(req, res, next) {
     try {
       const companyId = req.user.company_id;
-      const requestId = Number.parseInt(req.params.id);
+      const requestId = req.params.id; // Use string ID
 
       const result = await RequestService.rejectRequest(requestId, companyId);
 
