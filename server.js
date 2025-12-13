@@ -120,6 +120,12 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Middleware เพื่อเก็บ raw body ของคำขอ
+app.use(express.json({ limit: config.bodyLimit, verify: (req, res, buf) => {
+  req.rawBody = buf;
+  console.log('Raw body:', buf.toString());
+}}));
+
 /** --------------------------------------------------------------------
  * จัดการเส้นทางที่ไม่พบ (404) และข้อผิดพลาดที่ไม่ได้จัดการ (500)
  */
