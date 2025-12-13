@@ -12,7 +12,7 @@ const app = express();
 
 // กำหนดพอร์ตจาก environment variable หรือใช้ค่าเริ่มต้น 3000
 const {
-  NODE_ENV = "development",
+  NODE_ENV,
   PORT = 3000,
   CORS_ORIGIN = "*",
   BODY_LIMIT = "100kb",
