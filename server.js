@@ -15,7 +15,7 @@ const {
   NODE_ENV,
   PORT = 3000,
   CORS_ORIGIN = "*",
-  BODY_LIMIT = "100kb",
+  BODY_LIMIT = "10mb",
   RATE_LIMIT_WINDOW_MS,
   RATE_LIMIT_MAX = 100,
   TRUST_PROXY = "true",
@@ -30,6 +30,16 @@ if (
   // 1 หมายถึง เชื่อถือ proxy ชั้นบนสุด (common for PaaS like Render/Heroku)
   app.set("trust proxy", 1);
 }
+
+// เพิ่ม log ใน health check
+app.get("/debug", (req, res) => {
+  res.json({
+    ip: req.ip,
+    headers: req.headers["x-forwarded-for"],
+    trustProxy: app.get("trust proxy"),
+    bodyLimit: BODY_LIMIT,
+  });
+});
 
 // กำหนดตัวเลือก CORS
 const corsOptions =
