@@ -19,6 +19,7 @@ const overtimeRoutes = require("./modules/overtime/overtime.routes");
 const shiftRoutes = require("./modules/shifts/shifts.routes");
 const requestRoutes = require("./modules/request/request.routes");
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
+const reportRoutes = require("./modules/reports/report.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -36,6 +37,7 @@ router.use(`${API_VERSION}/overtimes`, overtimeRoutes);
 router.use(`${API_VERSION}/shifts`, shiftRoutes);
 router.use(`${API_VERSION}/requests`, requestRoutes);
 router.use(`${API_VERSION}/dashboard`, dashboardRoutes);
+router.use(`${API_VERSION}/reports`, reportRoutes);
 
 /**
  * API Info route
