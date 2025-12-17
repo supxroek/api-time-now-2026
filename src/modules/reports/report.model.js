@@ -6,6 +6,7 @@
  */
 
 const pool = require("../../config/database");
+const crypto = require("node:crypto");
 
 class ReportModel {
   /**
@@ -327,7 +328,9 @@ class ReportModel {
           100,
           Math.round((monthData.attendance_count / expectedRecords) * 100)
         );
-        const lateRate = Math.max(0, 100 - attendanceRate - Math.random() * 5);
+        // ใช้ CSPRNG แทน Math.random() เพื่อความปลอดภัย
+        const randSmall = crypto.randomInt(0, 5000) / 1000; // 0.000 - 4.999
+        const lateRate = Math.max(0, 100 - attendanceRate - randSmall);
 
         result.push({
           month: monthNames[i - 1],
