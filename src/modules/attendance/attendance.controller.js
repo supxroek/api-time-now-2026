@@ -44,7 +44,7 @@ class AttendanceController {
    */
   async checkOut(req, res, next) {
     try {
-      const employeeId = req.user?.employee_id;
+      const employeeId = req.body.employee_id;
 
       if (!employeeId) {
         return res.status(401).json({
@@ -73,7 +73,7 @@ class AttendanceController {
    */
   async breakStart(req, res, next) {
     try {
-      const employeeId = req.user?.employee_id;
+      const employeeId = req.body.employee_id;
 
       if (!employeeId) {
         return res.status(401).json({
@@ -100,7 +100,7 @@ class AttendanceController {
    */
   async breakEnd(req, res, next) {
     try {
-      const employeeId = req.user?.employee_id;
+      const employeeId = req.body.employee_id;
 
       if (!employeeId) {
         return res.status(401).json({
@@ -129,7 +129,7 @@ class AttendanceController {
    */
   async getTodayAttendance(req, res, next) {
     try {
-      const employeeId = req.user?.employee_id;
+      const employeeId = Number.parseInt(req.query.employeeId, 10);
 
       if (!employeeId) {
         return res.status(401).json({
@@ -155,7 +155,7 @@ class AttendanceController {
    */
   async getAttendanceHistory(req, res, next) {
     try {
-      const employeeId = req.user?.employee_id;
+      const employeeId = Number.parseInt(req.query.employeeId, 10);
 
       if (!employeeId) {
         return res.status(401).json({
@@ -192,7 +192,7 @@ class AttendanceController {
    */
   async getAttendanceSummary(req, res, next) {
     try {
-      const employeeId = req.user?.employee_id;
+      const employeeId = Number.parseInt(req.query.employeeId, 10);
 
       if (!employeeId) {
         return res.status(401).json({

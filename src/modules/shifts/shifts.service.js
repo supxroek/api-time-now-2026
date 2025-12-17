@@ -63,6 +63,7 @@ class ShiftService {
 
       return newShift;
     } catch (error) {
+      console.error("Error creating shift:", error);
       throw error;
     }
   }
@@ -101,6 +102,7 @@ class ShiftService {
       // ดึงข้อมูลที่อัปเดตแล้วกลับมา
       return await ShiftModel.findById(shiftId, companyId);
     } catch (error) {
+      console.error("Error updating shift:", error);
       throw error;
     }
   }
@@ -138,6 +140,7 @@ class ShiftService {
       // ดึงข้อมูลที่อัปเดตแล้วกลับมา
       return await ShiftModel.findById(shiftId, companyId);
     } catch (error) {
+      console.error("Error assigning shift to employees:", error);
       throw error;
     }
   }
@@ -162,6 +165,7 @@ class ShiftService {
 
       return true;
     } catch (error) {
+      console.error("Error deleting shift:", error);
       throw error;
     }
   }
