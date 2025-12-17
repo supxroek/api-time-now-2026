@@ -16,13 +16,13 @@ const getReportData = async (req, res, next) => {
     const companyId = req.user.company_id;
     const { startDate, endDate, year } = req.query;
 
-    const data = reportService.getReportData(companyId, {
+    const data = await reportService.getReportData(companyId, {
       startDate,
       endDate,
       year: year ? Number.parseInt(year, 10) : undefined,
     });
 
-    res.json({
+    return res.json({
       success: true,
       data,
     });

@@ -15,7 +15,7 @@ class CompanyService {
   async getCompanyById(companyId) {
     // ตรวจสอบ companyId
     if (!companyId) {
-      throw new Error("Company ID is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     // ดึงข้อมูลบริษัทจากฐานข้อมูลตาม companyId
     const company = await companyModel.findCompanyById(companyId);
@@ -30,7 +30,7 @@ class CompanyService {
     try {
       // ตรวจสอบ companyId
       if (!companyId) {
-        throw new Error("Company ID is required");
+        throw new Error("กรุณาเข้าสู่ระบบใหม่");
       }
       // อัปเดตข้อมูลบริษัทในฐานข้อมูล
       const updatedCompany = await companyModel.updateCompany(

@@ -15,7 +15,7 @@ class OvertimeService {
   // ดึงข้อมูลชั่วโมงทำงานล่วงเวลาทั้งหมด
   async getAllOvertimes(companyId) {
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     return await OvertimeModel.findAll(companyId);
   }
@@ -39,7 +39,7 @@ class OvertimeService {
     try {
       // ตรวจสอบข้อมูลที่จำเป็น
       if (!companyId) {
-        throw new Error("overtimeData and companyId are required");
+        throw new Error("ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบอีกครั้ง");
       }
       // ตรวจสอบชื่อชั่วโมงทำงานล่วงเวลาไม่ให้ซ้ำกันภายในบริษัท
       const existingOvertime = await OvertimeModel.findByName(
@@ -48,7 +48,7 @@ class OvertimeService {
       );
 
       if (existingOvertime) {
-        throw new Error("Overtime name already exists for this company");
+        throw new Error(`ชื่อ OT "${overtimeData.overTimeName}" มีอยู่ในระบบแล้ว`);
       }
 
       const newOvertime = await OvertimeModel.create(overtimeData, companyId);

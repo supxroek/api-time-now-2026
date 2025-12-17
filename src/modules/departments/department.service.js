@@ -15,7 +15,7 @@ class DepartmentService {
   async getDepartments(companyId) {
     // ตรวจสอบ companyId
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     return await DepartmentModel.findAllByCompanyId(companyId);
   }
@@ -24,7 +24,7 @@ class DepartmentService {
   async createDepartment(companyId, departmentData) {
     // ตรวจสอบ companyId
     if (!companyId || !departmentData) {
-      throw new Error("companyId and departmentData are required");
+      throw new Error("ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบอีกครั้ง");
     }
     // ตรวจสอบชื่อแผนกไม่ให้ซ้ำกันภายในบริษัท
     const existingDepartments = await DepartmentModel.findAllByCompanyId(
@@ -35,7 +35,7 @@ class DepartmentService {
     );
     if (isDuplicate) {
       throw new Error(
-        `Department name:${departmentData.departmentName} already exists within the company`
+        `ชื่อแผนก "${departmentData.departmentName}" มีอยู่ในระบบแล้ว`
       );
     }
 
@@ -51,7 +51,7 @@ class DepartmentService {
       companyId
     );
     if (!verifiedDepartment) {
-      throw new Error("Failed to verify department creation in database");
+      throw new Error("เกิดข้อผิดพลาดในการสร้างแผนก กรุณาลองใหม่");
     }
 
     return newDepartment;
@@ -88,7 +88,7 @@ class DepartmentService {
       );
       if (isDuplicate) {
         throw new Error(
-          `Department name:${updateData.departmentName} already exists within the company`
+          `ชื่อแผนก "${updateData.departmentName}" มีอยู่ในระบบแล้ว`
         );
       }
     }
@@ -116,7 +116,7 @@ class DepartmentService {
       companyId
     );
     if (!department) {
-      throw new Error("Department not found");
+      throw new Error("ไม่พบแผนกที่ต้องการลบ");
     }
 
     // ลบแผนก

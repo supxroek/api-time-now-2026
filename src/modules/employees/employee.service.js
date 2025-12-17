@@ -92,7 +92,7 @@ class EmployeeService {
   async getEmployees(companyId) {
     // ตรวจสอบ companyId
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
 
     // ดึงพนักงาน
@@ -120,7 +120,7 @@ class EmployeeService {
     try {
       // ตรวจสอบ companyId
       if (!companyId || !employeeData) {
-        throw new Error("companyId and employeeData are required");
+        throw new Error("ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบอีกครั้ง");
       }
       // ตรวจสอบ ID_or_Passport_Number และ lineUserId ไม่ให้ซ้ำกันภายในบริษัท
       const existingEmployees = await EmployeeModel.findAllByCompanyId(
@@ -133,7 +133,7 @@ class EmployeeService {
       );
       if (isDuplicate) {
         throw new Error(
-          `Employee with ID_or_Passport_Number:${employeeData.ID_or_Passport_Number} or lineUserId:${employeeData.lineUserId} already exists within the company`
+          `เลขบัตรประชาชนหรือ Line ID นี้มีอยู่ในระบบแล้ว`
         );
       }
 
@@ -164,17 +164,17 @@ class EmployeeService {
   // ดึงข้อมูลพนักงานตาม ID สำหรับบริษัทที่ระบุ
   async getEmployeeById(companyId, employeeId) {
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     if (!employeeId) {
-      throw new Error("employeeId is required");
+      throw new Error("กรุณาระบุรหัสพนักงาน");
     }
 
     // ดึงพนักงาน
     const employee = await EmployeeModel.findById(companyId, employeeId);
     // ตรวจสอบว่ามีข้อมูลพนักงานหรือไม่
     if (!employee) {
-      throw new Error(`Employee with ID:${employeeId} not found`);
+      throw new Error(`ไม่พบข้อมูลพนักงาน`);
     }
 
     return employee;
@@ -219,13 +219,13 @@ class EmployeeService {
     try {
       // ตรวจสอบ companyId
       if (!companyId) {
-        throw new Error("companyId is required");
+        throw new Error("กรุณาเข้าสู่ระบบใหม่");
       }
       if (!employeeId) {
-        throw new Error("employeeId is required");
+        throw new Error("กรุณาระบุรหัสพนักงาน");
       }
       if (!resignDate) {
-        throw new Error("resignDate is required");
+        throw new Error("กรุณาระบุวันที่ลาออก");
       }
 
       // แปลง resignDate เป็นวัตถุ Date
@@ -233,14 +233,14 @@ class EmployeeService {
       // ตรวจสอบให้แน่ใจว่า resignDate ไม่อยู่ก่อน start_date ของพนักงาน
       const employee = await EmployeeModel.findById(companyId, employeeId);
       if (!employee) {
-        throw new Error(`Employee with ID:${employeeId} not found`);
+        throw new Error(`ไม่พบข้อมูลพนักงาน`);
       }
       // ใช้ DateUtil.isBefore() เพื่อเปรียบเทียบวันที่
       if (
         employee.start_date &&
         DateUtil.isBefore(parsedResignDate, employee.start_date)
       ) {
-        throw new Error("resignDate cannot be earlier than start_date");
+        throw new Error("วันที่ลาออกต้องไม่ก่อนวันเริ่มงาน");
       }
 
       resignDate = parsedResignDate;

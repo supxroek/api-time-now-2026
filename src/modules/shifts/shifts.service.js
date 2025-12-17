@@ -15,7 +15,7 @@ class ShiftService {
   // ดึงข้อมูลกะการทำงานทั้งหมด
   async getAllShifts(companyId) {
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     return await ShiftModel.findAll(companyId);
   }
@@ -25,7 +25,7 @@ class ShiftService {
     try {
       // ตรวจสอบข้อมูลที่จำเป็น
       if (!companyId) {
-        throw new Error("shiftData and companyId are required");
+        throw new Error("ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบอีกครั้ง");
       }
 
       // ตรวจสอบ shift_name ไม่ให้ซ้ำกันภายในบริษัท
@@ -34,7 +34,7 @@ class ShiftService {
         companyId
       );
       if (existingShift) {
-        throw new Error("Shift name already exists within the company");
+        throw new Error(`ชื่อกะ "${shiftData.shift_name}" มีอยู่ในระบบแล้ว`);
       }
 
       // แปลงเวลาเป็น format TIME (HH:mm:ss)
@@ -73,7 +73,7 @@ class ShiftService {
     try {
       // ตรวจสอบข้อมูลที่จำเป็น
       if (!shiftId || !companyId) {
-        throw new Error("shiftId and companyId are required");
+        throw new Error("ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบอีกครั้ง");
       }
 
       // แปลงเวลาเป็น format TIME (HH:mm:ss)
@@ -112,7 +112,7 @@ class ShiftService {
     try {
       const { shiftId, employeeIds } = assignmentData;
       if (!shiftId || !employeeIds) {
-        throw new Error("shiftId and employeeIds are required");
+        throw new Error("กรุณาระบุกะและพนักงานที่ต้องการมอบหมาย");
       }
 
       // ตรวจสอบว่า shift มีอยู่จริง
@@ -134,7 +134,7 @@ class ShiftService {
       );
 
       if (!updated) {
-        throw new Error("Failed to assign shift to employees");
+        throw new Error("ไม่สามารถมอบหมายกะให้พนักงานได้");
       }
 
       // ดึงข้อมูลที่อัปเดตแล้วกลับมา

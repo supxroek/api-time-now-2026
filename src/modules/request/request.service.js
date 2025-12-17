@@ -19,7 +19,7 @@ class RequestService {
    */
   async getMyRequests(employeeId, companyId) {
     if (!employeeId || !companyId) {
-      throw new Error("employeeId and companyId are required");
+      throw new Error("ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบอีกครั้ง");
     }
     return await RequestModel.findByEmployeeId(employeeId, companyId);
   }
@@ -79,7 +79,7 @@ class RequestService {
    */
   async getPendingRequests(companyId) {
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     return await RequestModel.findPendingRequests(companyId);
   }
@@ -89,7 +89,7 @@ class RequestService {
    */
   async getRequestHistory(companyId, filters) {
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     const items = await RequestModel.findRequestHistory(companyId, filters);
     const total = await RequestModel.countRequestHistory(companyId, filters);
@@ -107,7 +107,7 @@ class RequestService {
    */
   async getRequestStats(companyId) {
     if (!companyId) {
-      throw new Error("companyId is required");
+      throw new Error("กรุณาเข้าสู่ระบบใหม่");
     }
     return await RequestModel.getRequestStats(companyId);
   }
@@ -218,7 +218,7 @@ class RequestService {
     await connection.beginTransaction();
     try {
       if (!requestId || !companyId) {
-        throw new Error("requestId and companyId are required");
+        throw new Error("ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบอีกครั้ง");
       }
 
       // ตรวจสอบว่าคำขอมีอยู่และยังเป็น pending

@@ -21,11 +21,11 @@ class AuthService {
     // ตรวจสอบผู้ใช้และรหัสผ่าน
     const user = await authModel.findUserByEmail(email);
     if (!user) {
-      throw new Error("Invalid email or password");
+      throw new Error("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
     }
     const isPasswordValid = await authModel.verifyPassword(user, password);
     if (!isPasswordValid) {
-      throw new Error("Invalid email or password");
+      throw new Error("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
     }
 
     // สร้าง token
@@ -69,7 +69,7 @@ class AuthService {
       // ตรวจสอบว่าผู้ใช้มีอยู่แล้วหรือไม่
       const existingUser = await authModel.findUserByEmail(email);
       if (existingUser) {
-        throw new Error("Email already in use");
+        throw new Error("อีเมลนี้ถูกใช้งานแล้ว");
       }
       // เพิ่มผู้ใช้ใหม่
       const newUser = await authModel.createUser(email, password, role);
@@ -94,7 +94,7 @@ class AuthService {
       // ตรวจสอบและสร้าง token ใหม่
       const payload = JWT.verifyToken(oldToken);
       if (!payload) {
-        throw new Error("Invalid token");
+        throw new Error("Token ไม่ถูกต้องหรือหมดอายุ");
       }
       // สร้าง token ใหม่
       const newToken = JWT.generateToken({
