@@ -48,7 +48,9 @@ class OvertimeService {
       );
 
       if (existingOvertime) {
-        throw new Error(`ชื่อ OT "${overtimeData.overTimeName}" มีอยู่ในระบบแล้ว`);
+        throw new Error(
+          `ชื่อ OT "${overtimeData.overTimeName}" มีอยู่ในระบบแล้ว`
+        );
       }
 
       const newOvertime = await OvertimeModel.create(overtimeData, companyId);

@@ -132,9 +132,7 @@ class EmployeeService {
           emp.lineUserId === employeeData.lineUserId
       );
       if (isDuplicate) {
-        throw new Error(
-          `เลขบัตรประชาชนหรือ Line ID นี้มีอยู่ในระบบแล้ว`
-        );
+        throw new Error(`เลขบัตรประชาชนหรือ Line ID นี้มีอยู่ในระบบแล้ว`);
       }
 
       // กำหนดค่าเริ่มต้นหากไม่ได้ระบุ สร้างเป็น Object
