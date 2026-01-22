@@ -64,25 +64,25 @@ const createPool = () => {
     connectionLimit: Number.parseInt(DB_CONN_LIMIT || "10"),
   };
 
-  // if (isProduction && INSTANCE_CONNECTION_NAME) {
-  //   // การตั้งค่าสำหรับ Production (Cloud Run via Socket)
-  //   console.log("🔵 Connecting to production database (Socket)...");
-  //   pool = mysql.createPool({
-  //     ...baseConfig,
-  //     socketPath: `/cloudsql/${INSTANCE_CONNECTION_NAME}`,
-  //   });
-  // } else {
-  // การตั้งค่าสำหรับ Development หรือ Production แบบ TCP
-  console.log(
-    `🔵 Connecting to database (TCP) at ${DB_HOST}:${DB_PORT || 3306}...`
-  );
-  pool = mysql.createPool({
-    ...baseConfig,
-    host: DB_HOST,
-    port: DB_PORT ? Number.parseInt(DB_PORT) : 3306,
-    ssl: loadSSLCert(),
-  });
-  // }
+  if (isProduction && INSTANCE_CONNECTION_NAME) {
+    // การตั้งค่าสำหรับ Production (Cloud Run via Socket)
+    console.log("🔵 Connecting to production database (Socket)...");
+    pool = mysql.createPool({
+      ...baseConfig,
+      socketPath: `/cloudsql/${INSTANCE_CONNECTION_NAME}`,
+    });
+  } else {
+    // การตั้งค่าสำหรับ Development หรือ Production แบบ TCP
+    console.log(
+      `🔵 Connecting to database (TCP) at ${DB_HOST}:${DB_PORT || 3306}...`
+    );
+    pool = mysql.createPool({
+      ...baseConfig,
+      host: DB_HOST,
+      port: DB_PORT ? Number.parseInt(DB_PORT) : 3306,
+      ssl: loadSSLCert(),
+    });
+  }
 
   console.log("🟢 Database pool created.");
   return pool;
@@ -110,10 +110,10 @@ const testPool = () => {
 };
 
 // สร้างพูลการเชื่อมต่อ สำหรับแอปหลัก
-const pool = createPool();
+// const pool = createPool();
 
 // สร้างพูลการเชื่อมต่อ สำหรับการทดสอบ
-// const pool = testPool();
+const pool = testPool();
 
 // ส่งออกพูลการเชื่อมต่อ
 module.exports = pool;

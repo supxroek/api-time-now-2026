@@ -14,17 +14,19 @@ const { JWT_SECRET, JWT_EXPIRES_IN = "1h" } = process.env;
 //  JWT Class
 class JWT {
   // สร้าง JWT token
-  generateToken(payload) {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  generateToken(payload, expiresIn) {
+    const opts = expiresIn ? { expiresIn } : { expiresIn: JWT_EXPIRES_IN };
+    return jwt.sign(payload, JWT_SECRET, opts);
   }
 
   // ตรวจสอบและถอดรหัส JWT token
   verifyToken(token) {
     try {
-      return jwt.verify(token, JWT_SECRET);
+      const payload = jwt.verify(token, JWT_SECRET);
+      return { valid: true, payload };
     } catch (error) {
       console.error("JWT verification failed:", error);
-      return null; // ถ้า token ไม่ถูกต้อง ให้คืนค่า null
+      return { valid: false, error: error.message };
     }
   }
 }

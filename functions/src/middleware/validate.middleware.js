@@ -14,7 +14,6 @@ const Joi = require("joi");
  */
 const validate = (schema, property = "body") => {
   return (req, res, next) => {
-    console.log("[validate] path:", req.path, "body:", req[property]); // เพิ่มบรรทัดนี้
     // ดำเนินการ validate
     const { error, value } = schema.validate(req[property], {
       abortEarly: false, // แสดง error ทั้งหมด ไม่หยุดที่ error แรก
@@ -55,9 +54,14 @@ const authSchemas = {
     role: Joi.string().valid("admin", "user").required(), // กำหนดบทบาทผู้ใช้
   }),
 
-  refreshToken: Joi.object({
-    token: Joi.string().required(), // โทเค็นต้องมีค่า
-  }),
+  // รองรับทั้ง body-based และ cookie-based refresh token
+  // - Empty object: Refresh Token อยู่ใน httpOnly Cookie
+  // - { token: ... } หรือ { refreshToken: ... }: Refresh Token อยู่ใน body
+  refreshToken: Joi.alternatives().try(
+    Joi.object({}), // Empty body - Cookie-based refresh token
+    Joi.object({ token: Joi.string().required() }),
+    Joi.object({ refreshToken: Joi.string().required() })
+  ),
 };
 
 // ========================================

@@ -1,11 +1,17 @@
+const { onRequest } = require("firebase-functions/v2/https");
+const { setGlobalOptions } = require("firebase-functions/v2");
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 
 // โหลด environment variables จากไฟล์ .env
 require("dotenv").config();
+
+// กำหนด Region เป็น asia-southeast1
+setGlobalOptions({ region: "asia-southeast1" });
 
 // สร้าง app Express
 const app = express();
@@ -78,7 +84,8 @@ const limiter = rateLimit({
 app
   .use(helmet())
   .use(morgan(NODE_ENV === "production" ? "combined" : "dev"))
-  .use(cors({ origin: config.corsOptions }))
+  .use(cors({ ...config.corsOptions, credentials: true }))
+  .use(cookieParser())
   .use(express.json({ limit: config.bodyLimit }))
   .use(express.urlencoded({ extended: false, limit: config.bodyLimit }))
   .use(limiter);
@@ -121,10 +128,15 @@ app.get("/health", (req, res) => {
 });
 
 // Middleware เพื่อเก็บ raw body ของคำขอ
-app.use(express.json({ limit: config.bodyLimit, verify: (req, res, buf) => {
-  req.rawBody = buf;
-  console.log('Raw body:', buf.toString());
-}}));
+app.use(
+  express.json({
+    limit: config.bodyLimit,
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+      console.log("Raw body:", buf.toString());
+    },
+  })
+);
 
 /** --------------------------------------------------------------------
  * จัดการเส้นทางที่ไม่พบ (404) และข้อผิดพลาดที่ไม่ได้จัดการ (500)
@@ -137,48 +149,66 @@ app
   .use(errorHandler); // ใช้ error handler จาก middleware
 
 /** --------------------------------------------------------------------
- * เริ่มต้นเซิร์ฟเวอร์
+ * Export function สำหรับ Firebase Functions v2
  */
-const server = app.listen(config.port);
-// กำหนด base URL
-const baseUrl = `http://localhost:${config.port}`;
-// แสดงข้อความเมื่อเซิร์ฟเวอร์เริ่มทำงาน
-server.on("listening", () => {
-  console.log(`🚀 Server running in ${NODE_ENV} mode`);
-  console.log(`🌐 Local: ${baseUrl}`);
-  console.log(`🛠️  Health Check: ${baseUrl}/health`);
-  console.log(`🔧 Press Ctrl+C to stop the server`);
-});
-// จัดการข้อผิดพลาดของเซิร์ฟเวอร์
-server.on("error", (err) => {
-  if (err?.code === "EADDRINUSE") {
-    console.error(`❌ Port ${PORT} is already in use`);
-    console.error(
-      `→ To fix: stop the process using the port or run with a different PORT (e.g. PORT=3001)`
-    );
-    process.exit(1);
-  } else {
-    console.error("Server error:", err);
-    process.exit(1);
-  }
-});
+exports.api = onRequest(
+  {
+    region: "asia-southeast1",
+    memory: "2GB",
+    timeoutSeconds: 60,
+    // เพิ่ม instanceConnections หากมีค่า INSTANCE_CONNECTION_NAME
+    instanceConnections: process.env.INSTANCE_CONNECTION_NAME,
+    // กำหนด service account ถ้ามี
+    serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT,
+  },
+  app
+);
 
 /** --------------------------------------------------------------------
- * ตัวจัดการปิดเซิร์ฟเวอร์อย่างปลอดภัยเมื่อเกิดข้อผิดพลาดที่ไม่คาดคิด
+ * เริ่มต้นเซิร์ฟเวอร์ (สำหรับการรัน Local หรือ Dev)
  */
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason);
-  if (server?.close) {
-    server.close(() => process.exit(1));
-  } else {
-    process.exit(1);
-  }
-});
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err);
-  if (server?.close) {
-    server.close(() => process.exit(1));
-  } else {
-    process.exit(1);
-  }
-});
+if (require.main === module) {
+  const server = app.listen(config.port);
+  // กำหนด base URL
+  const baseUrl = `http://localhost:${config.port}`;
+  // แสดงข้อความเมื่อเซิร์ฟเวอร์เริ่มทำงาน
+  server.on("listening", () => {
+    console.log(`🚀 Server running in ${NODE_ENV} mode`);
+    console.log(`🌐 Local: ${baseUrl}`);
+    console.log(`🛠️  Health Check: ${baseUrl}/health`);
+    console.log(`🔧 Press Ctrl+C to stop the server`);
+  });
+  // จัดการข้อผิดพลาดของเซิร์ฟเวอร์
+  server.on("error", (err) => {
+    if (err?.code === "EADDRINUSE") {
+      console.error(`❌ Port ${PORT} is already in use`);
+      console.error(
+        `→ To fix: stop the process using the port or run with a different PORT (e.g. PORT=3001)`
+      );
+      process.exit(1);
+    } else {
+      console.error("Server error:", err);
+      process.exit(1);
+    }
+  });
+
+  /** --------------------------------------------------------------------
+   * ตัวจัดการปิดเซิร์ฟเวอร์อย่างปลอดภัยเมื่อเกิดข้อผิดพลาดที่ไม่คาดคิด
+   */
+  process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled Rejection:", reason);
+    if (server?.close) {
+      server.close(() => process.exit(1));
+    } else {
+      process.exit(1);
+    }
+  });
+  process.on("uncaughtException", (err) => {
+    console.error("Uncaught Exception:", err);
+    if (server?.close) {
+      server.close(() => process.exit(1));
+    } else {
+      process.exit(1);
+    }
+  });
+}

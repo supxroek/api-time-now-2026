@@ -11,6 +11,13 @@ class CompanyModel {
 
   // อัปเดตข้อมูลบริษัทในฐานข้อมูล โดยใช้ PATCH
   async updateCompany(companyId, updateData) {
+    // sanitize branch (remove leading non-letter/number e.g. phinthu or dots)
+    if (Object.hasOwn(updateData, "branch")) {
+      updateData.branch = String(updateData.branch ?? "")
+        .trim()
+        .replace(/^[^\p{L}\p{N}]+/u, ""); // ลบอักขระนำหน้าไม่ใช่ตัวอักษร/ตัวเลข
+    }
+
     const fields = [];
     const values = [];
     for (const key in updateData) {

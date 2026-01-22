@@ -1,0 +1,160 @@
+# Generic .gitignore for backend projects (Node/Python/Java/Go/.NET/Ruby/etc.)
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+package-lock.json
+
+#certs
+src/config/certs/*.pem
+
+# Runtime / env
+.env
+.env.*.local
+local.settings.json
+*.local
+*.secret
+
+# Node
+node_modules/
+.pnp
+.pnp.js
+.pnp.cjs
+.npm/
+.cache/
+.nyc_output/
+dist/
+build/
+# keep lockfiles (package-lock.json, yarn.lock, pnpm-lock.yaml) tracked
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.env/
+.venv/
+ENV/
+env/
+build/
+dist/
+eggs/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+htmlcov/
+.coverage
+.coverage.*
+.cache
+pytestdebug.log
+
+# Java / Kotlin / Gradle / Maven
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+hs_err_pid*
+.gradle/
+gradle-app.setting
+*.iml
+.settings/
+.idea/
+.mvn/wrapper/maven-wrapper.jar
+
+# Go
+bin/
+pkg/
+*.exe
+*.test
+vendor/  # optionally remove if you vendoring dependencies; include if you don't commit vendor
+
+# Ruby
+*.gem
+*.rbc
+.bundle/
+vendor/bundle/
+log/
+tmp/
+db/*.sqlite3
+public/system
+.byebug_history
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.ncb
+*.aps
+*.ilk
+*.log
+*.pdb
+.vs/
+
+# Docker
+*.rancher-compose.yml
+docker-compose.override.yml
+.docker/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+crash.log
+.terraform/
+.terraform.lock.hcl
+
+# IDEs & editors
+.vscode/
+.idea/
+*.iml
+*.iws
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# Coverage / reports
+coverage/
+coverage-html/
+report.xml
+junit-reports/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+dump.rdb
+
+# Misc
+*.swp
+*~ 
+*.tmp
+*.bak
+npm-debug.log
+yarn-error.log
+.sass-cache/
+.cache/
+
+# Optional: keep secrets out (uncomment to be stricter)
+# secrets.yml
+# credentials.yml.enc
+
+# End of file

@@ -121,6 +121,7 @@ class DashboardModel {
     // สร้าง base query
     let query = `
       SELECT 
+        e.id as empId,
         tr.id,
         tr.employeeid,
         tr.start_time as checkIn,
@@ -192,8 +193,10 @@ class DashboardModel {
       }
 
       return {
-        id: row.id || row.employeeid,
+        id: row.id || row.empId,
+        employeeId: row.employeeid || row.empId,
         user: {
+          id: row.empId,
           name: row.employeeName,
           role: null,
           department: row.departmentName || "ไม่ระบุแผนก",
@@ -349,7 +352,8 @@ class DashboardModel {
    * @param {number} days - จำนวนวันย้อนหลัง
    */
   async getEmployeeHistory(employeeId, days = 5) {
-    const [rows] = await pool.query(
+    // First attempt: assume employeeId is an actual employee id
+    let [rows] = await pool.query(
       `SELECT 
         tr.id,
         DATE(tr.created_at) as date,
@@ -364,6 +368,32 @@ class DashboardModel {
       LIMIT ?`,
       [employeeId, days]
     );
+
+    // Fallback: if no rows found, maybe caller passed a timestamp record id (tr.id)
+    if ((!rows || rows.length === 0) && Number.isInteger(Number(employeeId))) {
+      const [found] = await pool.query(
+        `SELECT employeeid FROM timestamp_records WHERE id = ? LIMIT 1`,
+        [employeeId]
+      );
+      if (found?.[0]?.employeeid) {
+        const resolvedEmployeeId = found[0].employeeid;
+        [rows] = await pool.query(
+          `SELECT 
+            tr.id,
+            DATE(tr.created_at) as date,
+            tr.start_time,
+            tr.end_time,
+            wt.start_time as shift_start_time,
+            wt.free_time as grace_period
+          FROM timestamp_records tr
+          LEFT JOIN workingTime wt ON tr.workingTimeId = wt.id
+          WHERE tr.employeeid = ?
+          ORDER BY tr.created_at DESC
+          LIMIT ?`,
+          [resolvedEmployeeId, days]
+        );
+      }
+    }
 
     return rows.map((row) => {
       const checkInMinutes = this._timeToMinutes(row.start_time);

@@ -17,6 +17,15 @@ class AuthModel {
     return await bcrypt.compare(password, user.password_hash);
   }
 
+  // ค้นหาผู้ใช้ตาม id
+  async findUserById(id) {
+    const [rows] = await pool.query(
+      "SELECT * FROM users WHERE id = ? LIMIT 1",
+      [id]
+    );
+    return rows[0] || null;
+  }
+
   // อัปเดต last_login
   async updateLastLogin(userId) {
     await pool.query("UPDATE users SET last_login = NOW() WHERE id = ?", [
@@ -36,11 +45,28 @@ class AuthModel {
 
   // อัปเดต refresh token
   async updateRefreshToken(userId, refreshToken, expiresAt) {
-    // บันทึก refresh token ในฐานข้อมูล
+    // ลบ refresh token เดิมทั้งหมดของผู้ใช้ (single active token policy)
+    await pool.query("DELETE FROM refresh_tokens WHERE user_id = ?", [userId]);
+
+    // บันทึก refresh token ใหม่ในฐานข้อมูล
     await pool.query(
       "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
       [userId, refreshToken, expiresAt]
     );
+  }
+
+  // ค้นหา refresh token โดยค่า token
+  async findRefreshToken(token) {
+    const [rows] = await pool.query(
+      "SELECT * FROM refresh_tokens WHERE token = ? LIMIT 1",
+      [token]
+    );
+    return rows[0] || null;
+  }
+
+  // ลบ refresh tokens ทั้งหมดของผู้ใช้ (revoke)
+  async deleteRefreshTokensByUser(userId) {
+    await pool.query("DELETE FROM refresh_tokens WHERE user_id = ?", [userId]);
   }
 }
 

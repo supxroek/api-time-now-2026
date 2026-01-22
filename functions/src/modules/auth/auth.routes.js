@@ -29,4 +29,7 @@ router
     authController.refreshToken
   );
 
+// Logout / revoke refresh tokens
+router.post("/logout", authController.logout);
+
 module.exports = router;

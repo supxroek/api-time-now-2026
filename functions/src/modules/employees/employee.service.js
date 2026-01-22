@@ -9,7 +9,7 @@
 const pool = require("../../config/database");
 const EmployeeModel = require("./employee.model");
 const DateUtil = require("../../utilities/date");
-const XLSX = require("xlsx");
+const ExcelJS = require("exceljs");
 
 // ==================== Constants ====================
 // คอลัมน์ที่จำเป็นต้องมีในการ import
@@ -475,13 +475,15 @@ class EmployeeService {
   }
 
   // Private Helper Methods: แปลงไฟล์ Excel เป็น array ของ objects
-  _parseExcelFile(buffer) {
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
+  async _parseExcelFile(buffer) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const worksheet = workbook.worksheets[0];
 
     // แปลงเป็น JSON (header row เป็น keys)
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+    const rawData = workbook.xlsx.utils.sheet_to_json(worksheet, {
+      defval: null,
+    });
 
     if (rawData.length === 0) {
       return {
