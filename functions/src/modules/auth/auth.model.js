@@ -1,72 +1,78 @@
-const pool = require("../../config/database");
-const bcrypt = require("bcrypt");
+const db = require("../../config/db.config");
 
-// Model Class
+// Auth Model
 class AuthModel {
+  // ==============================================================
+  // สร้างผู้ใช้ใหม่
+  async createUser(userData) {
+    const { company_id, employee_id, email, password_hash, role } = userData;
+    const query = `
+      INSERT INTO users (company_id, employee_id, email, password_hash, role, is_active)
+      VALUES (?, ?, ?, ?, ?, 1)
+    `;
+    const [result] = await db.query(query, [
+      company_id,
+      employee_id,
+      email,
+      password_hash,
+      role || "admin",
+    ]);
+    return result.insertId;
+  }
+
+  // ==============================================================
   // ค้นหาผู้ใช้ตามอีเมล
   async findUserByEmail(email) {
-    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [
-      email,
-    ]);
+    const query = `SELECT * FROM users WHERE email = ?`;
+    const [rows] = await db.execute(query, [email]);
     return rows[0];
   }
 
-  // ตรวจสอบรหัสผ่าน
-  async verifyPassword(user, password) {
-    // ตรวจสอบด้วย bcrypt
-    return await bcrypt.compare(password, user.password_hash);
-  }
-
-  // ค้นหาผู้ใช้ตาม id
+  // ==============================================================
+  // ค้นหาผู้ใช้ตาม ID
   async findUserById(id) {
-    const [rows] = await pool.query(
-      "SELECT * FROM users WHERE id = ? LIMIT 1",
-      [id]
-    );
-    return rows[0] || null;
+    const query = `SELECT * FROM users WHERE id = ?`;
+    const [rows] = await db.query(query, [id]);
+    return rows[0];
   }
 
-  // อัปเดต last_login
+  // ==============================================================
+  // อัปเดตเวลาการเข้าสู่ระบบล่าสุด
   async updateLastLogin(userId) {
-    await pool.query("UPDATE users SET last_login = NOW() WHERE id = ?", [
-      userId,
-    ]);
+    const query = `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`;
+    await db.query(query, [userId]);
   }
 
-  // สร้างผู้ใช้ใหม่
-  async createUser(email, password, role) {
-    const passwordHash = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      "INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)",
-      [email, passwordHash, role]
-    );
-    return { id: result.insertId, email, role };
+  // ==============================================================
+  // สร้าง Refresh Token ใหม่
+  async createRefreshToken(userId, token, expiresAt) {
+    const query = `
+      INSERT INTO refresh_tokens (user_id, token, expires_at, is_revoked)
+      VALUES (?, ?, ?, 0)
+    `;
+    await db.query(query, [userId, token, expiresAt]);
   }
 
-  // อัปเดต refresh token
-  async updateRefreshToken(userId, refreshToken, expiresAt) {
-    // ลบ refresh token เดิมทั้งหมดของผู้ใช้ (single active token policy)
-    await pool.query("DELETE FROM refresh_tokens WHERE user_id = ?", [userId]);
-
-    // บันทึก refresh token ใหม่ในฐานข้อมูล
-    await pool.query(
-      "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
-      [userId, refreshToken, expiresAt]
-    );
-  }
-
-  // ค้นหา refresh token โดยค่า token
+  // ==============================================================
+  // ค้นหา Refresh Token
   async findRefreshToken(token) {
-    const [rows] = await pool.query(
-      "SELECT * FROM refresh_tokens WHERE token = ? LIMIT 1",
-      [token]
-    );
-    return rows[0] || null;
+    const query = `SELECT * FROM refresh_tokens WHERE token = ?`;
+    const [rows] = await db.query(query, [token]);
+    return rows[0];
   }
 
-  // ลบ refresh tokens ทั้งหมดของผู้ใช้ (revoke)
-  async deleteRefreshTokensByUser(userId) {
-    await pool.query("DELETE FROM refresh_tokens WHERE user_id = ?", [userId]);
+  // ==============================================================
+  // ยกเลิก Refresh Token
+  async revokeRefreshToken(id) {
+    const query = `UPDATE refresh_tokens SET is_revoked = 1 WHERE id = ?`;
+    await db.query(query, [id]);
+  }
+
+  // ==============================================================
+  // ยกเลิก Refresh Token ทั้งหมดของผู้ใช้
+  async revokeAllUserRefreshTokens(userId) {
+    const query = `UPDATE refresh_tokens SET is_revoked = 1 WHERE user_id = ?`;
+    await db.query(query, [userId]);
   }
 }
 

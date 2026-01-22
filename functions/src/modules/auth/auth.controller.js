@@ -1,159 +1,126 @@
-/**
- * /src/modules/auth/auth.controller.js
- *
- * Auth Controller
- * จัดการ request/response สำหรับ Auth endpoints
- */
+const AuthService = require("./auth.service");
+const catchAsync = require("../../utils/catchAsync");
+const AppError = require("../../utils/AppError");
 
-// import services and helpers
-const authService = require("./auth.service");
-require("dotenv").config();
-
-// อ่านค่าตัวแปรสภาพแวดล้อมที่เกี่ยวข้องกับ cookie
-// (Firebase Hosting requires `__session` in some setups)
-const { NODE_ENV = "production", COOKIE_NAME = "__session" } = process.env;
-
-// Helper สำหรับสร้าง Cookie Options เพื่อใช้ร่วมกันในหลายจุด
-// Development: sameSite=lax, secure=false (localhost ใช้ HTTP)
-// Production: sameSite=none, secure=true (Cross-origin ต้องใช้ HTTPS)
-const getCookieOptions = (expiresAt = null) => {
-  const isDev = NODE_ENV !== "production";
-
-  const options = {
-    httpOnly: true,
-    secure: !isDev, // Dev: false (HTTP), Prod: true (HTTPS)
-    sameSite: isDev ? "lax" : "none", // Dev: lax, Prod: none (cross-origin)
-    path: "/",
-    // กำหนด maxAge เป็น fallback (7 วัน)
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  };
-
-  if (expiresAt) {
-    options.expires = new Date(expiresAt);
-    delete options.maxAge; // ใช้ expires แทนถ้ามีค่าที่ชัดเจนจาก DB
-  }
-
-  return options;
+// Cookie Options
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production", // ส่งเฉพาะ HTTPS ในโหมด Production
+  sameSite: "strict",
+  maxAge: 7 * 24 * 60 * 60 * 1000, // หมดอายุ 7 วัน
 };
 
-// Controller Class
+// Auth Controller
 class AuthController {
-  // POST /api/auth/login
-  async login(req, res) {
-    try {
-      const { email, password } = req.body;
-      const user = await authService.login(email, password);
-
-      // บันทึกการเข้าสู่ระบบ (optional)
-      await authService.recordLogin(user.id);
-
-      // ตั้งค่า refresh token เป็น httpOnly cookie
-      const refreshToken = user.refreshToken;
-      // คำนวณ options สำหรับ cookie
-      const cookieOptions = getCookieOptions(user.refreshTokenExpiresAt);
-      res.cookie(COOKIE_NAME, refreshToken, cookieOptions);
-
-      // กรองข้อมูลที่จะส่งกลับไปยัง client (ไม่ส่ง refreshToken กลับใน body)
-      const { password_hash, refreshTokenExpiresAt, ...result } = user; // ลบ sensitive fields
-      res.status(200).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      console.error("Login error:", error); // Log the full error
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
+  // ==============================================================
+  // สมัครสมาชิก
+  register = catchAsync(async (req, res, next) => {
+    // ตรวจสอบข้อมูลที่จำเป็น
+    const { email, password, company_id } = req.body;
+    if (!email || !password || !company_id) {
+      return next(
+        new AppError("กรุณาระบุ email, password และ company_id", 400),
+      );
     }
-  }
 
-  // POST /api/auth/register
-  async register(req, res) {
-    try {
-      const { email, password, role } = req.body;
-      const result = await authService.register(email, password, role);
-      res.status(201).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
+    // สมัครสมาชิก (เรียกใช้ Service)
+    const newUser = await AuthService.register(req.body);
+
+    // ตอบกลับผลลัพธ์
+    res.status(201).json({
+      status: "success",
+      data: {
+        user: newUser,
+      },
+    });
+  });
+
+  // ==============================================================
+  // เข้าสู่ระบบ
+  login = catchAsync(async (req, res, next) => {
+    // ตรวจสอบข้อมูลที่จำเป็น
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return next(new AppError("กรุณาระบุ email และ password", 400));
     }
-  }
 
-  // POST /api/auth/refresh-token
-  async refreshToken(req, res) {
-    try {
-      // Prefer cookie-based refresh token (httpOnly)
-      const refreshTokenFromCookie = req.cookies?.[COOKIE_NAME];
-      const refreshToken = req.body?.refreshToken || refreshTokenFromCookie;
+    // เข้าสู่ระบบ (เรียกใช้ Service)
+    const { user, accessToken, refreshToken } = await AuthService.login(
+      email,
+      password,
+    );
 
-      if (!refreshToken) {
-        console.error(
-          "[RefreshToken] Missing token. Cookies keys:",
-          Object.keys(req.cookies || {})
-        );
-        throw new Error("Refresh token is missing");
-      }
+    // ส่ง Refresh Token ผ่าน Cookie
+    res.cookie("refreshToken", refreshToken, cookieOptions);
 
-      const tokens = await authService.refreshToken(refreshToken);
-      // tokens: { accessToken, refreshToken }
-      // Set new refresh token in httpOnly cookie (rotation)
-      const cookieOptions = getCookieOptions();
-      res.cookie(COOKIE_NAME, tokens.refreshToken, cookieOptions);
-      res.json({
-        success: true,
-        data: {
-          token: tokens.accessToken,
-        },
-      });
-    } catch (error) {
-      console.error("Refresh Token Error:", error.message);
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
+    // ตอบกลับผลลัพธ์
+    res.status(200).json({
+      status: "success",
+      token: accessToken, // ส่ง Access Token ใน Body
+      data: {
+        user,
+      },
+    });
+  });
+
+  // ==============================================================
+  // ออกจากระบบ
+  logout = catchAsync(async (req, res, next) => {
+    const { refreshToken } = req.cookies;
+
+    // ยกเลิกโทเค็นในฐานข้อมูล
+    await AuthService.logout(refreshToken);
+
+    // ล้าง Cookie
+    res.clearCookie("refreshToken", { ...cookieOptions, maxAge: 0 });
+
+    // ตอบกลับผลลัพธ์
+    res.status(200).json({
+      status: "success",
+      message: "ออกจากระบบเรียบร้อยแล้ว",
+    });
+  });
+
+  // ==============================================================
+  // ขอ Access Token ใหม่
+  refreshToken = catchAsync(async (req, res, next) => {
+    // ดึง Refresh Token จาก Cookie
+    const { refreshToken } = req.cookies;
+    if (!refreshToken) {
+      return next(new AppError("ไม่พบ Refresh Token", 401));
     }
-  }
 
-  // POST /api/auth/logout
-  async logout(req, res) {
-    try {
-      // try to obtain userId from body or Authorization header
-      let userId = req.body?.userId;
-      if (!userId) {
-        const authHeader =
-          req.headers["authorization"] || req.headers["Authorization"];
-        if (authHeader?.startsWith("Bearer ")) {
-          const token = authHeader.split(" ")[1];
-          const verifyResult = require("./handleToken").verifyToken(token);
-          if (verifyResult?.valid && verifyResult.payload?.id)
-            userId = verifyResult.payload.id;
-        }
-      }
+    // ขอ Access Token ใหม่ (เรียกใช้ Service)
+    const tokens = await AuthService.refreshToken(refreshToken);
 
-      if (!userId) {
-        return res.status(400).json({
-          success: false,
-          error: "Missing userId or Authorization token",
-        });
-      }
+    // อัปเดต Cookie ด้วย Refresh Token ใหม่ (Rotation)
+    res.cookie("refreshToken", tokens.refreshToken, cookieOptions);
 
-      // call service to revoke refresh tokens
-      await authService.logout(userId);
-      // clear cookie on logout
-      res.clearCookie(COOKIE_NAME);
+    // ตอบกลับผลลัพธ์
+    res.status(200).json({
+      status: "success",
+      token: tokens.accessToken,
+    });
+  });
 
-      return res.json({ success: true, data: { revoked: true } });
-    } catch (error) {
-      console.error("Logout error:", error);
-      return res.status(400).json({ success: false, error: error.message });
+  // ==============================================================
+  // ขอรีเซ็ตรหัสผ่าน
+  forgotPassword = catchAsync(async (req, res, next) => {
+    // ตรวจสอบข้อมูลที่จำเป็น
+    const { email } = req.body;
+    if (!email) {
+      return next(new AppError("กรุณาระบุ email", 400));
     }
-  }
+
+    // ขอรีเซ็ตรหัสผ่าน (เรียกใช้ Service)
+    const result = await AuthService.forgotPassword(email);
+
+    // ตอบกลับผลลัพธ์
+    res.status(200).json({
+      status: "success",
+      message: result.message,
+    });
+  });
 }
 
 module.exports = new AuthController();
