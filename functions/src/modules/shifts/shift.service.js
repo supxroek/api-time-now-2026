@@ -30,15 +30,21 @@ class ShiftService {
       (cleanData.start_time && cleanData.end_time) ||
       (cleanData.break_start_time && cleanData.break_end_time)
     ) {
-      //ตรวจสอบว่า start_time น้อยกว่า end_time
-      if (cleanData.start_time >= cleanData.end_time) {
+      //ตรวจสอบว่า start_time น้อยกว่า end_time ถ้าไม่ใช่ night shift
+      if (
+        !cleanData.is_night_shift &&
+        cleanData.start_time >= cleanData.end_time
+      ) {
         throw new AppError(
           "เวลาเริ่มต้นกะการทำงานต้องน้อยกว่าเวลาสิ้นสุดกะการทำงาน",
           400,
         );
       }
-      // ตรวจสอบว่า break_start_time น้อยกว่า break_end_time
-      if (cleanData.break_start_time >= cleanData.break_end_time) {
+      // ตรวจสอบว่า break_start_time น้อยกว่า break_end_time ถ้าไม่ใช่ night shift
+      if (
+        !cleanData.is_night_shift &&
+        cleanData.break_start_time >= cleanData.break_end_time
+      ) {
         throw new AppError(
           "เวลาเริ่มต้นช่วงพักต้องน้อยกว่าเวลาสิ้นสุดช่วงพัก",
           400,
