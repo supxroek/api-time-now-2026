@@ -57,6 +57,14 @@ class BranchModel {
   }
 
   // ==============================================================
+  // ดึงข้อมูลสาขาคนเดียวตามชื่อ
+  async findByName(branchName, companyId) {
+    const query = `SELECT * FROM branches WHERE branch_name = ? AND company_id = ? AND deleted_at IS NULL`;
+    const [rows] = await db.query(query, [branchName, companyId]);
+    return rows[0];
+  }
+
+  // ==============================================================
   // อัปเดตข้อมูลสาขา
   async update(id, companyId, data) {
     const keys = Object.keys(data);

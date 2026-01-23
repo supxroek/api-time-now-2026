@@ -67,6 +67,14 @@ class DepartmentModel {
   }
 
   // ==============================================================
+  // ดึงข้อมูลแผนกคนเดียวตามชื่อ
+  async findByName(departmentName, companyId) {
+    const query = `SELECT * FROM departments WHERE department_name = ? AND company_id = ?`;
+    const [rows] = await db.query(query, [departmentName, companyId]);
+    return rows[0];
+  }
+
+  // ==============================================================
   // อัปเดตข้อมูลแผนก
   async update(id, companyId, data) {
     const keys = Object.keys(data);

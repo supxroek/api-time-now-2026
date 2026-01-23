@@ -15,6 +15,20 @@ class DepartmentService {
       company_id: companyId,
     };
 
+    // Check duplicate department_name
+    if (cleanData.department_name) {
+      const existingDept = await DepartmentModel.findByName(
+        cleanData.department_name,
+        companyId,
+      );
+      if (existingDept) {
+        throw new AppError(
+          `ชื่อแผนก '${cleanData.department_name}' นี้มีอยู่ในระบบแล้ว`,
+          400,
+        );
+      }
+    }
+
     const newDeptId = await DepartmentModel.create(dataToCreate);
 
     try {
@@ -80,6 +94,23 @@ class DepartmentService {
     const oldDept = await DepartmentModel.findById(id, companyId);
     if (!oldDept) {
       throw new AppError("ไม่พบข้อมูลแผนกที่ต้องการแก้ไข", 404);
+    }
+
+    // Check Duplicate department_name if changing
+    if (
+      updateData.department_name &&
+      updateData.department_name !== oldDept.department_name
+    ) {
+      const existingDept = await DepartmentModel.findByName(
+        updateData.department_name,
+        companyId,
+      );
+      if (existingDept) {
+        throw new AppError(
+          `ชื่อแผนก '${updateData.department_name}' นี้มีอยู่ในระบบแล้ว`,
+          400,
+        );
+      }
     }
 
     delete updateData.id;

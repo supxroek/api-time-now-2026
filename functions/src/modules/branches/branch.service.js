@@ -15,6 +15,20 @@ class BranchService {
       company_id: companyId,
     };
 
+    // Check duplicate branch_name
+    if (cleanData.branch_name) {
+      const existingBranch = await BranchModel.findByName(
+        cleanData.branch_name,
+        companyId,
+      );
+      if (existingBranch) {
+        throw new AppError(
+          `สาขาชื่อ '${cleanData.branch_name}' นี้มีอยู่ในระบบแล้ว`,
+          400,
+        );
+      }
+    }
+
     const newBranchId = await BranchModel.create(dataToCreate);
 
     try {
@@ -80,6 +94,23 @@ class BranchService {
     const oldBranch = await BranchModel.findById(id, companyId);
     if (!oldBranch) {
       throw new AppError("ไม่พบข้อมูลสาขาที่ต้องการแก้ไข", 404);
+    }
+
+    // Check Duplicate branch_name if changing
+    if (
+      updateData.branch_name &&
+      updateData.branch_name !== oldBranch.branch_name
+    ) {
+      const existingBranch = await BranchModel.findByName(
+        updateData.branch_name,
+        companyId,
+      );
+      if (existingBranch) {
+        throw new AppError(
+          `สาขาชื่อ '${updateData.branch_name}' นี้มีอยู่ในระบบแล้ว`,
+          400,
+        );
+      }
     }
 
     // Protect immutable fields
