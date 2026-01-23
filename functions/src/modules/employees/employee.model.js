@@ -87,6 +87,35 @@ class EmployeeModel {
   }
 
   // ==============================================================
+  // ดึงข้อมูลพนักงานตามฟิลด์ที่เป็นเอกลักษณ์ (เช่น email หรือ employee_code)
+  async findByUniqueFields(companyId, uniqueData) {
+    const fields = Object.keys(uniqueData).filter(
+      (key) =>
+        uniqueData[key] !== null &&
+        uniqueData[key] !== undefined &&
+        uniqueData[key] !== "",
+    );
+
+    if (fields.length === 0) return null;
+
+    const conditions = fields.map((field) => `${field} = ?`).join(" OR ");
+    const values = fields.map((field) => uniqueData[field]);
+
+    // Query นี้จะหาว่ามีใครที่ใช้ข้อมูลใดข้อมูลหนึ่งซ้ำ ภายใต้บริษัทเดียวกัน
+    const query = `
+        SELECT email, id_or_passport_number, line_user_id 
+        FROM employees 
+        WHERE (${conditions}) 
+        AND company_id = ? 
+        AND deleted_at IS NULL 
+        LIMIT 1
+    `;
+
+    const [rows] = await db.query(query, [...values, companyId]);
+    return rows[0];
+  }
+
+  // ==============================================================
   // อัปเดตข้อมูลพนักงาน
   async update(id, companyId, data) {
     const keys = Object.keys(data);

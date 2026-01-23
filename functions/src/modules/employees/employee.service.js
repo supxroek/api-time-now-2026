@@ -14,6 +14,44 @@ class EmployeeService {
       company_id: companyId,
     };
 
+    if (
+      dataToCreate.email ||
+      dataToCreate.id_or_passport_number ||
+      dataToCreate.line_user_id
+    ) {
+      const existingEmployee = await EmployeeModel.findByUniqueFields(
+        companyId,
+        {
+          email: dataToCreate.email,
+          id_or_passport_number: dataToCreate.id_or_passport_number,
+          line_user_id: dataToCreate.line_user_id,
+        },
+      );
+
+      if (existingEmployee) {
+        // สร้าง Map สำหรับแสดงผลภาษาไทย
+        const fieldMap = {
+          email: "อีเมล",
+          id_or_passport_number: "เลขบัตรประชาชน/หนังสือเดินทาง",
+          line_user_id: "Line User ID",
+        };
+
+        // หาว่าฟิลด์ไหนที่ซ้ำ (เปรียบเทียบค่าที่ส่งมากับค่าที่มีใน DB)
+        const duplicateKey = Object.keys(fieldMap).find(
+          (key) =>
+            dataToCreate[key] && existingEmployee[key] === dataToCreate[key],
+        );
+
+        const label = fieldMap[duplicateKey];
+        const value = existingEmployee[duplicateKey];
+
+        throw new AppError(
+          `${label} '${value}' นี้มีอยู่ในระบบแล้ว`,
+          400,
+        );
+      }
+    }
+
     // 2. เพิ่มข้อมูลในฐานข้อมูล
     const newEmployeeId = await EmployeeModel.create(dataToCreate);
 
