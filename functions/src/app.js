@@ -23,6 +23,7 @@ const otTemplateRoutes = require("./modules/ot_templates/ot_template.routes");
 const attendanceLogRoutes = require("./modules/attendance_logs/attendance_log.routes");
 const requestRoutes = require("./modules/requests/request.routes");
 const auditTrailRoutes = require("./modules/audit_trail/audit_trail.routes");
+const companySettingRoutes = require("./modules/comapny_settings/comapny_settings.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -44,6 +45,7 @@ router.use(`${API_VERSION}/ot-templates`, otTemplateRoutes);
 router.use(`${API_VERSION}/attendance-logs`, attendanceLogRoutes);
 router.use(`${API_VERSION}/requests`, requestRoutes);
 router.use(`${API_VERSION}/audit-trails`, auditTrailRoutes);
+router.use(`${API_VERSION}/company-settings`, companySettingRoutes);
 
 /**
  * API Info route
