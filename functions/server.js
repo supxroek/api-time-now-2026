@@ -69,10 +69,13 @@ if (config.trustProxy) {
 }
 
 // กำหนดค่า CORS (อ้างอิงค่าจาก config กลาง)
-config.corsOrigin =
+config.corsOptions =
   config.corsOrigin === "*"
-    ? { origin: true }
-    : { origin: config.corsOrigin.split(",").map((s) => s.trim()) };
+    ? { origin: true, credentials: true }
+    : {
+        origin: config.corsOrigin.split(",").map((s) => s.trim()),
+        credentials: true,
+      };
 
 // ตั้งค่า rate limiting (จาก config กลาง)
 const limiter = rateLimit({
@@ -86,7 +89,7 @@ const limiter = rateLimit({
 // ตั้งค่า middleware
 app
   .use(helmet())
-  .use(cors(config.corsOrigin))
+  .use(cors(config.corsOptions))
   .use(cookieParser())
   .use(express.json({ limit: config.bodyLimit }))
   .use(express.urlencoded({ extended: true, limit: config.bodyLimit }))

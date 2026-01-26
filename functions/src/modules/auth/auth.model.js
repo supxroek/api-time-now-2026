@@ -23,7 +23,12 @@ class AuthModel {
   // ==============================================================
   // ค้นหาผู้ใช้ตามอีเมล
   async findUserByEmail(email) {
-    const query = `SELECT * FROM users WHERE email = ?`;
+    const query = `
+      SELECT u.*, e.name, e.employee_code 
+      FROM users u
+      LEFT JOIN employees e ON u.employee_id = e.id
+      WHERE u.email = ?
+    `;
     const [rows] = await db.execute(query, [email]);
     return rows[0];
   }
