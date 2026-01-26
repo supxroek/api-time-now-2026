@@ -90,8 +90,7 @@ class DepartmentModel {
   // ==============================================================
   // ลบแผนก
   async delete(id, companyId) {
-    // Note: ตาราง departments ไม่มีคอลัมน์ deleted_at ใน schema ที่ให้มา
-    // ดังนั้นจึงทำการลบจริง (hard delete)
+    // ทำการลบจริง (hard delete)
     const query = `DELETE FROM departments WHERE id = ? AND company_id = ?`;
     await db.query(query, [id, companyId]);
   }

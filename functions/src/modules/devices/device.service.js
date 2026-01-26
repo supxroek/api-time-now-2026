@@ -21,6 +21,17 @@ class DeviceService {
       }
     }
 
+    //check branch_id belong to company
+    if (cleanData.branch_id) {
+      const branch = await require("../branches/branch.model").findById(
+        cleanData.branch_id,
+        companyId,
+      );
+      if (!branch) {
+        throw new AppError("สาขาที่ระบุไม่มีอยู่ในบริษัทนี้", 400);
+      }
+    }
+
     const dataToCreate = {
       ...cleanData,
       company_id: companyId,
@@ -130,6 +141,34 @@ class DeviceService {
   }
 
   // ==============================================================
+  // ลบอุปกรณ์แบบนุ่มนวล (soft delete)
+  async softDeleteDevice(user, id, ipAddress) {
+    const companyId = user.company_id;
+    const oldDevice = await DeviceModel.findById(id, companyId);
+
+    if (!oldDevice) {
+      throw new AppError("ไม่พบข้อมูลอุปกรณ์ที่ต้องการลบ", 404);
+    }
+
+    await DeviceModel.softDelete(id, companyId);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "DELETE",
+        table: "devices",
+        recordId: id,
+        oldVal: oldDevice,
+        newVal: { ...oldDevice, deleted_at: new Date(), is_active: 0 },
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
   // ลบอุปกรณ์
   async deleteDevice(user, id, ipAddress) {
     const companyId = user.company_id;
@@ -150,6 +189,59 @@ class DeviceService {
         recordId: id,
         oldVal: oldDevice,
         newVal: null,
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
+  // ดึงรายชื่ออุปกรณ์เฉพาะที่ถูกลบแบบ soft delete
+  async getDeletedDevices(companyId, query) {
+    const { page = 1, limit = 20, search, branch_id } = query;
+    const offset = (page - 1) * limit;
+    const filters = { search, branch_id };
+
+    const devices = await DeviceModel.findAllDeleted(
+      companyId,
+      filters,
+      Number(limit),
+      Number(offset),
+    );
+    const total = await DeviceModel.countAllDeleted(companyId, filters);
+
+    return {
+      devices,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // ==============================================================
+  // กู้คืนอุปกรณ์ที่ถูกลบแบบ soft delete
+  async restoreDevice(user, id, ipAddress) {
+    const companyId = user.company_id;
+    const oldDevice = await DeviceModel.findDeletedById(id, companyId);
+
+    if (!oldDevice) {
+      throw new AppError("ไม่พบข้อมูลอุปกรณ์ที่ต้องการกู้คืน", 404);
+    }
+
+    await DeviceModel.restore(id, companyId);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "UPDATE",
+        table: "devices",
+        recordId: id,
+        oldVal: oldDevice,
+        newVal: { ...oldDevice, deleted_at: null, is_active: 1 },
         ipAddress: ipAddress,
       });
     } catch (err) {

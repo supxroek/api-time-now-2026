@@ -26,4 +26,24 @@ router
   // Endpoint: /api/shifts/:id - ลบกะการทำงานรายบุคคล
   .delete(restrictTo("super_admin", "admin"), shiftController.delete);
 
+router
+  // Endpoint: /api/shifts/deleted/list - ดึงรายชื่อกะการทำงานที่ถูกลบแบบ soft delete
+  .get(
+    "/deleted/list",
+    restrictTo("super_admin", "admin", "manager"),
+    shiftController.getDeletedShifts,
+  )
+  // Endpoint: /api/shifts/soft-delete/:id - ลบกะการทำงานรายบุคคล (soft delete)
+  .delete(
+    "/soft-delete/:id",
+    restrictTo("super_admin", "admin"),
+    shiftController.softDelete,
+  )
+  // Endpoint: /api/shifts/restore/:id - กู้คืนกะการทำงานที่ถูกลบแบบ soft delete
+  .patch(
+    "/restore/:id",
+    restrictTo("super_admin", "admin"),
+    shiftController.restore,
+  );
+
 module.exports = router;

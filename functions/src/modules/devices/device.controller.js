@@ -64,6 +64,17 @@ class DeviceController {
   });
 
   // ==============================================================
+  // ลบอุปกรณ์แบบนุ่มนวล (soft delete)
+  softDelete = catchAsync(async (req, res, next) => {
+    await DeviceService.softDeleteDevice(req.user, req.params.id, req.ip);
+
+    res.status(204).json({
+      status: "success",
+      data: null,
+    });
+  });
+
+  // ==============================================================
   // ลบอุปกรณ์
   delete = catchAsync(async (req, res, next) => {
     await DeviceService.deleteDevice(req.user, req.params.id, req.ip);
@@ -71,6 +82,35 @@ class DeviceController {
     res.status(204).json({
       status: "success",
       data: null,
+    });
+  });
+
+  // ==============================================================
+  // ดึงรายชื่ออุปกรณ์เฉพาะที่ถูกลบแบบ soft delete
+  getDeletedDevices = catchAsync(async (req, res, next) => {
+    const result = await DeviceService.getDeletedDevices(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
+  // ==============================================================
+  // กู้คืนอุปกรณ์ที่ถูกลบแบบ soft delete
+  restore = catchAsync(async (req, res, next) => {
+    const restoredDevice = await DeviceService.restoreDevice(
+      req.user,
+      req.params.id,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: { device: restoredDevice },
     });
   });
 }

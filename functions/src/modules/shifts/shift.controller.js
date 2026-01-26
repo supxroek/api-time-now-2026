@@ -64,6 +64,17 @@ class ShiftController {
   });
 
   // ==============================================================
+  // ลบกะการทำงาน (soft delete)
+  softDelete = catchAsync(async (req, res, next) => {
+    await ShiftService.softDeleteShift(req.user, req.params.id, req.ip);
+
+    res.status(204).json({
+      status: "success",
+      data: null,
+    });
+  });
+
+  // ==============================================================
   // ลบกะการทำงาน
   delete = catchAsync(async (req, res, next) => {
     await ShiftService.deleteShift(req.user, req.params.id, req.ip);
@@ -71,6 +82,35 @@ class ShiftController {
     res.status(204).json({
       status: "success",
       data: null,
+    });
+  });
+
+  // ==============================================================
+  // ดึงข้อมูลกะการทำงานที่ถูกลบแบบ soft delete
+  getDeletedShifts = catchAsync(async (req, res, next) => {
+    const result = await ShiftService.getDeletedShifts(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
+  // ==============================================================
+  // กู้คืนกะการทำงานที่ถูกลบแบบ soft delete
+  restore = catchAsync(async (req, res, next) => {
+    const restoredShift = await ShiftService.restoreShift(
+      req.user,
+      req.params.id,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: { shift: restoredShift },
     });
   });
 }

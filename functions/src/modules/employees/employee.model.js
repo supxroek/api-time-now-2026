@@ -18,7 +18,7 @@ class EmployeeModel {
   // ==============================================================
   // ดึงข้อมูลพนักงานทั้งหมด พร้อม Pagination และ Filters
   async findAll(companyId, filters = {}, limit = 20, offset = 0) {
-    let query = `SELECT * FROM employees WHERE company_id = ? AND deleted_at IS NULL`;
+    let query = `SELECT * FROM employees WHERE company_id = ? AND deleted_at IS NULL AND resign_date IS NULL `;
     const params = [companyId];
 
     // เพิ่มเงื่อนไข Filters
@@ -51,7 +51,7 @@ class EmployeeModel {
   // ==============================================================
   // นับจำนวนพนักงานทั้งหมดที่ตรงกับ Filters
   async countAll(companyId, filters = {}) {
-    let query = `SELECT COUNT(*) as total FROM employees WHERE company_id = ? AND deleted_at IS NULL`;
+    let query = `SELECT COUNT(*) as total FROM employees WHERE company_id = ? AND deleted_at IS NULL AND resign_date IS NULL `;
     const params = [companyId];
 
     // เพิ่มเงื่อนไข Filters
@@ -81,7 +81,7 @@ class EmployeeModel {
   // ==============================================================
   // ดึงข้อมูลพนักงานคนเดียวตาม ID
   async findById(id, companyId) {
-    const query = `SELECT * FROM employees WHERE id = ? AND company_id = ? AND deleted_at IS NULL`;
+    const query = `SELECT * FROM employees WHERE id = ? AND company_id = ? AND deleted_at IS NULL AND resign_date IS NULL`;
     const [rows] = await db.query(query, [id, companyId]);
     return rows[0];
   }
@@ -108,6 +108,7 @@ class EmployeeModel {
         WHERE (${conditions}) 
         AND company_id = ? 
         AND deleted_at IS NULL 
+        AND resign_date IS NULL
         LIMIT 1
     `;
 

@@ -18,7 +18,7 @@ class ShiftPatternModel {
   // ==============================================================
   // ดึงข้อมูลรูปแบบกะการทำงานทั้งหมด พร้อม Pagination และ Filters
   async findAll(companyId, filters = {}, limit = 20, offset = 0) {
-    let query = `SELECT * FROM shift_patterns WHERE company_id = ?`;
+    let query = `SELECT * FROM shift_patterns WHERE company_id = ? AND deleted_at IS NULL`;
     const params = [companyId];
 
     if (filters.search) {
@@ -37,7 +37,7 @@ class ShiftPatternModel {
   // ==============================================================
   // นับจำนวนรูปแบบกะการทำงานทั้งหมดที่ตรงกับ Filters
   async countAll(companyId, filters = {}) {
-    let query = `SELECT COUNT(*) as total FROM shift_patterns WHERE company_id = ?`;
+    let query = `SELECT COUNT(*) as total FROM shift_patterns WHERE company_id = ? AND deleted_at IS NULL`;
     const params = [companyId];
 
     if (filters.search) {
@@ -53,7 +53,7 @@ class ShiftPatternModel {
   // ==============================================================
   // ดึงข้อมูลรูปแบบกะการทำงานคนเดียวตาม ID
   async findById(id, companyId) {
-    const query = `SELECT * FROM shift_patterns WHERE id = ? AND company_id = ?`;
+    const query = `SELECT * FROM shift_patterns WHERE id = ? AND company_id = ? AND deleted_at IS NULL`;
     const [rows] = await db.query(query, [id, companyId]);
     return rows[0];
   }
@@ -72,9 +72,66 @@ class ShiftPatternModel {
   }
 
   // ==============================================================
+  // ลบรูปแบบกะการทำงานแบบนุ่มนวล (soft delete)
+  async softDelete(id, companyId) {
+    const query = `UPDATE shift_patterns SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ? AND deleted_at IS NULL`;
+    await db.query(query, [id, companyId]);
+  }
+
+  // ==============================================================
   // ลบรูปแบบกะการทำงาน
   async delete(id, companyId) {
     const query = `DELETE FROM shift_patterns WHERE id = ? AND company_id = ?`;
+    await db.query(query, [id, companyId]);
+  }
+
+  // ==============================================================
+  // ดึงรายชื่อรูปแบบกะที่ถูกลบแบบ soft delete
+  async findAllDeleted(companyId, filters = {}, limit = 20, offset = 0) {
+    let query = `SELECT * FROM shift_patterns WHERE company_id = ? AND deleted_at IS NOT NULL`;
+    const params = [companyId];
+
+    if (filters.search) {
+      query += ` AND (name LIKE ?)`;
+      const searchTerm = `%${filters.search}%`;
+      params.push(searchTerm);
+    }
+
+    query += ` ORDER BY id ASC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    const [rows] = await db.query(query, params);
+    return rows;
+  }
+
+  // ==============================================================
+  // ดึงรูปแบบกะการทำงานที่ถูกลบแบบ soft delete ตาม ID
+  async findDeletedById(id, companyId) {
+    const query = `SELECT * FROM shift_patterns WHERE id = ? AND company_id = ? AND deleted_at IS NOT NULL`;
+    const [rows] = await db.query(query, [id, companyId]);
+    return rows[0];
+  }
+
+  // ==============================================================
+  // นับจำนวนรูปแบบกะการทำงานที่ถูกลบแบบ soft delete
+  async countAllDeleted(companyId, filters = {}) {
+    let query = `SELECT COUNT(*) as total FROM shift_patterns WHERE company_id = ? AND deleted_at IS NOT NULL`;
+    const params = [companyId];
+
+    if (filters.search) {
+      query += ` AND (name LIKE ?)`;
+      const searchTerm = `%${filters.search}%`;
+      params.push(searchTerm);
+    }
+
+    const [rows] = await db.query(query, params);
+    return rows[0].total;
+  }
+
+  // ==============================================================
+  // กู้คืนรูปแบบกะการทำงานที่ถูกลบแบบ soft delete
+  async restore(id, companyId) {
+    const query = `UPDATE shift_patterns SET deleted_at = NULL WHERE id = ? AND company_id = ? AND deleted_at IS NOT NULL`;
     await db.query(query, [id, companyId]);
   }
 }

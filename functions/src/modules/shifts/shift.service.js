@@ -155,8 +155,8 @@ class ShiftService {
   }
 
   // ==============================================================
-  // ลบกะการทำงาน
-  async deleteShift(user, id, ipAddress) {
+  // ลบกะการทำงาน (soft delete)
+  async softDeleteShift(user, id, ipAddress) {
     const companyId = user.company_id;
 
     const oldShift = await ShiftModel.findById(id, companyId);
@@ -167,6 +167,34 @@ class ShiftService {
     // Check if shift is used by any employee?
     // DB has constraint employees_ibfk_4: foreign key (default_shift_id) references shifts (id) on delete set null
     // So it is safe to delete, employees will have default_shift_id set to NULL.
+
+    await ShiftModel.softDelete(id, companyId);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "DELETE",
+        table: "shifts",
+        recordId: id,
+        oldVal: oldShift,
+        newVal: { ...oldShift, deleted_at: new Date() },
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
+  // ลบกะการทำงาน
+  async deleteShift(user, id, ipAddress) {
+    const companyId = user.company_id;
+
+    const oldShift = await ShiftModel.findById(id, companyId);
+    if (!oldShift) {
+      throw new AppError("ไม่พบข้อมูลกะการทำงาน", 404);
+    }
 
     await ShiftModel.delete(id, companyId);
 
@@ -179,6 +207,61 @@ class ShiftService {
         recordId: id,
         oldVal: oldShift,
         newVal: null,
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
+  // ดึงรายชื่อกะการทำงานเฉพาะที่ถูกลบแบบ soft delete
+  async getDeletedShifts(companyId, query) {
+    const { page = 1, limit = 20, search, type } = query;
+    const offset = (page - 1) * limit;
+    const filters = { search, type };
+
+    const shifts = await ShiftModel.findAllDeleted(
+      companyId,
+      filters,
+      Number(limit),
+      Number(offset),
+    );
+    const total = await ShiftModel.countAllDeleted(companyId, filters);
+
+    return {
+      shifts,
+      meta: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // ==============================================================
+  // กู้คืนกะการทำงานที่ถูกลบแบบ soft delete
+  async restoreShift(user, id, ipAddress) {
+    const companyId = user.company_id;
+
+    const oldShift = await ShiftModel.findDeletedById(id, companyId);
+
+    if (!oldShift) {
+      throw new AppError("ไม่พบข้อมูลกะการทำงานที่ถูกลบ", 404);
+    }
+
+    await ShiftModel.restore(id, companyId);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "UPDATE",
+        table: "shifts",
+        recordId: id,
+        oldVal: oldShift,
+        newVal: { ...oldShift, deleted_at: null },
         ipAddress: ipAddress,
       });
     } catch (err) {

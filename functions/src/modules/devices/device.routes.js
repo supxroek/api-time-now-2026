@@ -26,4 +26,26 @@ router
   // Endpoint: /api/devices/:id - ลบอุปกรณ์รายบุคคล
   .delete(restrictTo("super_admin", "admin"), deviceController.delete);
 
+// =============================================================
+// เส้นทางพิเศษ
+router
+  // Endpoint: /api/devices/deleted/list - ดึงรายชื่ออุปกรณ์ที่ถูกลบทั้งหมด (soft deleted)
+  .get(
+    "/deleted/list",
+    restrictTo("super_admin", "admin", "manager"),
+    deviceController.getDeletedDevices,
+  )
+  // Endpoint: /api/devices/soft-delete/:id - ลบอุปกรณ์รายบุคคล (soft delete)
+  .delete(
+    "/soft-delete/:id",
+    restrictTo("super_admin", "admin"),
+    deviceController.softDelete,
+  )
+  // Endpoint: /api/devices/restore/:id - กู้คืนอุปกรณ์รายบุคคล
+  .patch(
+    "/restore/:id",
+    restrictTo("super_admin", "admin"),
+    deviceController.restore,
+  );
+
 module.exports = router;

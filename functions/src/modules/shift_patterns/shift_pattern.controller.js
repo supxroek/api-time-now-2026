@@ -68,6 +68,21 @@ class ShiftPatternController {
   });
 
   // ==============================================================
+  // ลบรูปแบบกะการทำงาน (soft delete)
+  softDelete = catchAsync(async (req, res, next) => {
+    await ShiftPatternService.softDeleteShiftPattern(
+      req.user,
+      req.params.id,
+      req.ip,
+    );
+
+    res.status(204).json({
+      status: "success",
+      data: null,
+    });
+  });
+
+  // ==============================================================
   // ลบรูปแบบกะการทำงาน
   delete = catchAsync(async (req, res, next) => {
     await ShiftPatternService.deleteShiftPattern(
@@ -79,6 +94,35 @@ class ShiftPatternController {
     res.status(204).json({
       status: "success",
       data: null,
+    });
+  });
+
+  // ==============================================================
+  // ดึงรายชื่อรูปแบบกะที่ถูกลบแบบ soft delete
+  getDeletedPatterns = catchAsync(async (req, res, next) => {
+    const result = await ShiftPatternService.getDeletedPatterns(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
+  // ==============================================================
+  // กู้คืนรูปแบบกะที่ถูกลบแบบ soft delete
+  restore = catchAsync(async (req, res, next) => {
+    const restoredPattern = await ShiftPatternService.restoreShiftPattern(
+      req.user,
+      req.params.id,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: { pattern: restoredPattern },
     });
   });
 }

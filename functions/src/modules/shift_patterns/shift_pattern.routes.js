@@ -32,4 +32,24 @@ router
   // Endpoint: /api/shift-patterns/:id - ลบรูปแบบกะ
   .delete(restrictTo("super_admin", "admin"), shiftPatternController.delete);
 
+router
+  // Endpoint: /api/shift-patterns/deleted/list - ดึงรายชื่อรูปแบบกะที่ถูกลบแบบ soft delete
+  .get(
+    "/deleted/list",
+    restrictTo("super_admin", "admin", "manager"),
+    shiftPatternController.getDeletedPatterns,
+  )
+  // Endpoint: /api/shift-patterns/soft-delete/:id - ลบรูปแบบกะ (soft delete)
+  .delete(
+    "/soft-delete/:id",
+    restrictTo("super_admin", "admin"),
+    shiftPatternController.softDelete,
+  )
+  // Endpoint: /api/shift-patterns/restore/:id - กู้คืนรูปแบบกะที่ถูกลบแบบ soft delete
+  .patch(
+    "/restore/:id",
+    restrictTo("super_admin", "admin"),
+    shiftPatternController.restore,
+  );
+
 module.exports = router;

@@ -117,11 +117,39 @@ class ShiftPatternService {
   }
 
   // ==============================================================
-  // ลบรูปแบบกะการทำงาน
-  async deleteShiftPattern(user, id, ipAddress) {
+  // ลบรูปแบบกะการทำงาน (soft delete)
+  async softDeleteShiftPattern(user, id, ipAddress) {
     const companyId = user.company_id;
 
     const oldPattern = await ShiftPatternModel.findById(id, companyId);
+    if (!oldPattern) {
+      throw new AppError("ไม่พบข้อมูลรูปแบบกะการทำงาน", 404);
+    }
+
+    await ShiftPatternModel.softDelete(id, companyId);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "DELETE",
+        table: "shift_patterns",
+        recordId: id,
+        oldVal: oldPattern,
+        newVal: { ...oldPattern, deleted_at: new Date() },
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
+  // ลบรูปแบบกะการทำงาน
+  async deleteShiftPattern(user, id, ipAddress) {
+    const companyId = user.company_id;
+    const oldPattern = await ShiftPatternModel.findById(id, companyId);
+
     if (!oldPattern) {
       throw new AppError("ไม่พบข้อมูลรูปแบบกะการทำงาน", 404);
     }
@@ -137,6 +165,63 @@ class ShiftPatternService {
         recordId: id,
         oldVal: oldPattern,
         newVal: null,
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
+  // ดึงรายชื่อรูปแบบกะที่ถูกลบแบบ soft delete
+  async getDeletedPatterns(companyId, query) {
+    const { page = 1, limit = 20, search } = query;
+    const offset = (page - 1) * limit;
+
+    const filters = { search };
+
+    const patterns = await ShiftPatternModel.findAllDeleted(
+      companyId,
+      filters,
+      Number(limit),
+      Number(offset),
+    );
+
+    const total = await ShiftPatternModel.countAllDeleted(companyId, filters);
+
+    return {
+      patterns,
+      meta: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // ==============================================================
+  // กู้คืนรูปแบบกะที่ถูกลบแบบ soft delete
+  async restoreShiftPattern(user, id, ipAddress) {
+    const companyId = user.company_id;
+
+    const oldPattern = await ShiftPatternModel.findDeletedById(id, companyId);
+
+    if (!oldPattern) {
+      throw new AppError("ไม่พบข้อมูลรูปแบบกะการทำงานที่ถูกลบ", 404);
+    }
+
+    await ShiftPatternModel.restore(id, companyId);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "UPDATE",
+        table: "shift_patterns",
+        recordId: id,
+        oldVal: oldPattern,
+        newVal: { ...oldPattern, deleted_at: null },
         ipAddress: ipAddress,
       });
     } catch (err) {

@@ -18,7 +18,7 @@ class BranchModel {
   // ==============================================================
   // ดึงข้อมูลสาขาทั้งหมด พร้อม Pagination และ Filters
   async findAll(companyId, filters = {}, limit = 20, offset = 0) {
-    let query = `SELECT * FROM branches WHERE company_id = ? AND deleted_at IS NULL`;
+    let query = `SELECT * FROM branches WHERE company_id = ?`;
     const params = [companyId];
 
     if (filters.search) {
@@ -36,7 +36,7 @@ class BranchModel {
   // ==============================================================
   // นับจำนวนสาขาทั้งหมดที่ตรงกับ Filters
   async countAll(companyId, filters = {}) {
-    let query = `SELECT COUNT(*) as total FROM branches WHERE company_id = ? AND deleted_at IS NULL`;
+    let query = `SELECT COUNT(*) as total FROM branches WHERE company_id = ?`;
     const params = [companyId];
 
     if (filters.search) {
@@ -51,7 +51,7 @@ class BranchModel {
   // ==============================================================
   // ดึงข้อมูลสาขาคนเดียวตาม ID
   async findById(id, companyId) {
-    const query = `SELECT * FROM branches WHERE id = ? AND company_id = ? AND deleted_at IS NULL`;
+    const query = `SELECT * FROM branches WHERE id = ? AND company_id = ?`;
     const [rows] = await db.query(query, [id, companyId]);
     return rows[0];
   }
@@ -59,7 +59,7 @@ class BranchModel {
   // ==============================================================
   // ดึงข้อมูลสาขาคนเดียวตามชื่อ
   async findByName(branchName, companyId) {
-    const query = `SELECT * FROM branches WHERE branch_name = ? AND company_id = ? AND deleted_at IS NULL`;
+    const query = `SELECT * FROM branches WHERE branch_name = ? AND company_id = ?`;
     const [rows] = await db.query(query, [branchName, companyId]);
     return rows[0];
   }
@@ -78,9 +78,9 @@ class BranchModel {
   }
 
   // ==============================================================
-  // ลบสาขา (soft delete)
-  async softDelete(id, companyId) {
-    const query = `UPDATE branches SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?`;
+  // ลบสาขา (hard delete)
+  async delete(id, companyId) {
+    const query = `DELETE FROM branches WHERE id = ? AND company_id = ?`;
     await db.query(query, [id, companyId]);
   }
 }

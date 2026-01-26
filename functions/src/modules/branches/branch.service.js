@@ -116,7 +116,6 @@ class BranchService {
     // Protect immutable fields
     delete updateData.id;
     delete updateData.company_id;
-    delete updateData.deleted_at;
 
     await BranchModel.update(id, companyId, updateData);
 
@@ -149,7 +148,7 @@ class BranchService {
       throw new AppError("ไม่พบข้อมูลสาขา", 404);
     }
 
-    await BranchModel.softDelete(id, companyId);
+    await BranchModel.delete(id, companyId);
 
     try {
       await auditRecord({
@@ -159,7 +158,7 @@ class BranchService {
         table: "branches",
         recordId: id,
         oldVal: oldBranch,
-        newVal: { deleted_at: new Date() },
+        newVal: null,
         ipAddress: ipAddress,
       });
     } catch (err) {
