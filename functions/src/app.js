@@ -22,6 +22,7 @@ const rosterRoutes = require("./modules/rosters/roster.routes");
 const otTemplateRoutes = require("./modules/ot_templates/ot_template.routes");
 const attendanceLogRoutes = require("./modules/attendance_logs/attendance_log.routes");
 const requestRoutes = require("./modules/requests/request.routes");
+const auditTrailRoutes = require("./modules/audit_trail/audit_trail.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -42,6 +43,7 @@ router.use(`${API_VERSION}/rosters`, rosterRoutes);
 router.use(`${API_VERSION}/ot-templates`, otTemplateRoutes);
 router.use(`${API_VERSION}/attendance-logs`, attendanceLogRoutes);
 router.use(`${API_VERSION}/requests`, requestRoutes);
+router.use(`${API_VERSION}/audit-trails`, auditTrailRoutes);
 
 /**
  * API Info route
