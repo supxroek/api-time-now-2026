@@ -5,7 +5,7 @@ class CompanyModulesModel {
   // ==============================================================
   // ดึงรายการโมดูลบริษัททั้งหมด
   static async findAll(companyId, filters = {}, limit = 20, offset = 0) {
-    let query = `SELECT company_modules.*, modules.module_name AS module_name
+    let query = `SELECT company_modules.*, modules.module_name AS module_name, modules.module_key AS module_key
                  FROM company_modules
                  JOIN modules ON company_modules.module_id = modules.id
                  WHERE company_id = ?`;
