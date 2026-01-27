@@ -18,14 +18,15 @@ class CompanyModulesService {
       limit,
       offset,
     );
-    const total = await CompanyModulesModel.countAll(companyId, filters);
+    // const total = await CompanyModulesModel.countAll(companyId, filters);
 
     return {
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      total_pages: Math.ceil(total / limit),
-      data: modules,
+      // total,
+      // page: Number(page),
+      // limit: Number(limit),
+      // total_pages: Math.ceil(total / limit),
+      // data: modules,
+      modules,
     };
   }
 
