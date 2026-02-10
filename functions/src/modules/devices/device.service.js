@@ -242,6 +242,84 @@ class DeviceService {
       console.warn("Audit log failed:", err);
     }
   }
+
+  // ==============================================================
+  // อนุญาตการเข้าถึงอุปกรณ์
+  async grantDeviceAccess(user, deviceId, accessData, ipAddress) {
+    const { target_type, target_id } = accessData;
+    const companyId = user.company_id;
+
+    // Verify ownership
+    const device = await DeviceModel.findById(deviceId, companyId);
+    if (!device) {
+      throw new AppError("ไม่พบอุปกรณ์หรือคุณไม่มีสิทธิ์", 404);
+    }
+
+    if (!["employee", "department", "all"].includes(target_type)) {
+      throw new AppError(
+        "ประเภทเป้าหมายไม่ถูกต้อง (employee, department, all)",
+        400,
+      );
+    }
+
+    await DeviceModel.grantAccess(deviceId, target_type, target_id);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "INSERT",
+        table: "device_access_controls",
+        recordId: 0, // No specific ID returned or handled
+        oldVal: null,
+        newVal: { device_id: deviceId, target_type, target_id },
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
+  // เพิกถอนการเข้าถึงอุปกรณ์
+  async revokeDeviceAccess(user, deviceId, accessData, ipAddress) {
+    const { target_type, target_id } = accessData;
+    const companyId = user.company_id;
+
+    const device = await DeviceModel.findById(deviceId, companyId);
+    if (!device) {
+      throw new AppError("ไม่พบอุปกรณ์หรือคุณไม่มีสิทธิ์", 404);
+    }
+
+    await DeviceModel.revokeAccess(deviceId, target_type, target_id);
+
+    try {
+      await auditRecord({
+        userId: user.id,
+        companyId: companyId,
+        action: "DELETE",
+        table: "device_access_controls",
+        recordId: 0,
+        oldVal: { device_id: deviceId, target_type, target_id },
+        newVal: null,
+        ipAddress: ipAddress,
+      });
+    } catch (err) {
+      console.warn("Audit log failed:", err);
+    }
+  }
+
+  // ==============================================================
+  // ดึงรายการสิทธิ์ของอุปกรณ์
+  async getDeviceAccessControls(user, deviceId) {
+    const companyId = user.company_id;
+    const device = await DeviceModel.findById(deviceId, companyId);
+    if (!device) {
+      throw new AppError("ไม่พบอุปกรณ์หรือคุณไม่มีสิทธิ์", 404);
+    }
+
+    return await DeviceModel.findAccessControlsByDeviceId(deviceId);
+  }
 }
 
 module.exports = new DeviceService();

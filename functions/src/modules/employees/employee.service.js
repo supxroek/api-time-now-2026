@@ -45,10 +45,7 @@ class EmployeeService {
         const label = fieldMap[duplicateKey];
         const value = existingEmployee[duplicateKey];
 
-        throw new AppError(
-          `${label} '${value}' นี้มีอยู่ในระบบแล้ว`,
-          400,
-        );
+        throw new AppError(`${label} '${value}' นี้มีอยู่ในระบบแล้ว`, 400);
       }
     }
 

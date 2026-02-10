@@ -18,20 +18,28 @@ class DepartmentModel {
   // ==============================================================
   // ดึงข้อมูลแผนกทั้งหมด พร้อม Pagination และ Filters
   async findAll(companyId, filters = {}, limit = 20, offset = 0) {
-    let query = `SELECT * FROM departments WHERE company_id = ?`;
+    let query = `
+      SELECT d.*,
+             (SELECT COUNT(*) 
+              FROM employees e 
+              WHERE e.department_id = d.id 
+                AND e.status = 'active' 
+                AND e.deleted_at IS NULL) AS employee_count 
+      FROM departments d 
+      WHERE d.company_id = ?`;
     const params = [companyId];
 
     if (filters.search) {
-      query += ` AND department_name LIKE ?`;
+      query += ` AND d.department_name LIKE ?`;
       params.push(`%${filters.search}%`);
     }
 
     if (filters.branch_id) {
-      query += ` AND branch_id = ?`;
+      query += ` AND d.branch_id = ?`;
       params.push(filters.branch_id);
     }
 
-    query += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+    query += ` ORDER BY d.id DESC LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const [rows] = await db.query(query, params);

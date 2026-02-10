@@ -113,6 +113,52 @@ class DeviceController {
       data: { device: restoredDevice },
     });
   });
+
+  // ==============================================================
+  // อนุญาตการเข้าถึงอุปกรณ์
+  grantAccess = catchAsync(async (req, res, next) => {
+    await DeviceService.grantDeviceAccess(
+      req.user,
+      req.params.id,
+      req.body,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: null,
+    });
+  });
+
+  // ==============================================================
+  // เพิกถอนการเข้าถึงอุปกรณ์
+  revokeAccess = catchAsync(async (req, res, next) => {
+    await DeviceService.revokeDeviceAccess(
+      req.user,
+      req.params.id,
+      req.body,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: null,
+    });
+  });
+
+  // ==============================================================
+  // ดึงรายการสิทธิ์ของอุปกรณ์
+  getAccessControls = catchAsync(async (req, res, next) => {
+    const controls = await DeviceService.getDeviceAccessControls(
+      req.user,
+      req.params.id,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: { controls },
+    });
+  });
 }
 
 module.exports = new DeviceController();

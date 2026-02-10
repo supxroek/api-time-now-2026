@@ -38,7 +38,7 @@ router
   // Endpoint: /api/devices/soft-delete/:id - ลบอุปกรณ์รายบุคคล (soft delete)
   .delete(
     "/soft-delete/:id",
-    restrictTo("super_admin", "admin"),
+    restrictTo("super_admin", "admin"), 
     deviceController.softDelete,
   )
   // Endpoint: /api/devices/restore/:id - กู้คืนอุปกรณ์รายบุคคล
@@ -46,6 +46,28 @@ router
     "/restore/:id",
     restrictTo("super_admin", "admin"),
     deviceController.restore,
+  );
+
+// =============================================================
+// Access controls - การควบคุมการเข้าถึงอุปกรณ์
+router
+  // Endpoint: /api/devices/:id/access-controls - ดึงรายการสิทธิ์ของอุปกรณ์
+  .get(
+    "/:id/access-controls",
+    restrictTo("super_admin", "admin", "manager"),
+    deviceController.getAccessControls,
+  )
+  // Endpoint: /api/devices/:id/grant-access - อนุญาตการเข้าถึงอุปกรณ์
+  .post(
+    "/:id/grant-access",
+    restrictTo("super_admin", "admin"),
+    deviceController.grantAccess,
+  )
+  // Endpoint: /api/devices/:id/revoke-access - เพิกถอนการเข้าถึงอุปกรณ์
+  .post(
+    "/:id/revoke-access",
+    restrictTo("super_admin", "admin"),
+    deviceController.revokeAccess,
   );
 
 module.exports = router;
