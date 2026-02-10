@@ -49,6 +49,24 @@ class OtTemplateModel {
   }
 
   // ==============================================================
+  // นับจำนวนการใช้งานแม่แบบการทำงานล่วงเวลา
+  async countUsage(companyId) {
+    const query = `
+      SELECT ot.id, ot.name, COUNT(r.id) AS count
+      FROM ot_templates ot
+      LEFT JOIN requests r ON r.request_type = 'ot'
+      AND JSON_EXTRACT(r.request_data, '$.ot_template_id') = ot.id
+      AND r.company_id = ?
+      WHERE ot.company_id = ? AND ot.deleted_at IS NULL
+      GROUP BY ot.id, ot.name
+      ORDER BY count DESC;
+    `;
+    const [rows] = await db.query(query, [companyId, companyId]);
+
+    return rows[0];
+  }
+
+  // ==============================================================
   // ดึงแม่แบบการทำงานล่วงเวลาโดย ID
   async findById(id, companyId) {
     const query = `SELECT * FROM ot_templates WHERE id = ? AND company_id = ? AND deleted_at IS NULL`;

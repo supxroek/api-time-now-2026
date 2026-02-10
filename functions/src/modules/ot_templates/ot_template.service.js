@@ -67,8 +67,15 @@ class OtTemplateService {
     );
     const total = await OtTemplateModel.countAll(companyId, filters);
 
+    const usage = await OtTemplateModel.countUsage(companyId);
+
+    const templatesWithUsage = templates.map((template) => ({
+      ...template,
+      usage: usage,
+    }));
+
     return {
-      templates,
+      templates: templatesWithUsage,
       meta: {
         total,
         page: Number(page),

@@ -11,7 +11,7 @@ router.use(protect);
 router
   // Endpoint: /api/ot-templates - จัดการแม่แบบการทำงานล่วงเวลา
   .route("/")
-  // Endpoint: /api/ot-templates - ดึงรายชื่อแม่แบบการทำงานล่วงเวลาทั้งหมด
+  // Endpoint: /api/ot-templates - ดึงรายชื่อแม่แบบการทำงานล่วงเวลาทั้งหมด + ยอดใช้งานรวม
   .get(restrictTo("super_admin", "admin", "manager"), controller.getAll)
   // Endpoint: /api/ot-templates - สร้างแม่แบบการทำงานล่วงเวลาใหม่
   .post(restrictTo("super_admin", "admin"), controller.create);
