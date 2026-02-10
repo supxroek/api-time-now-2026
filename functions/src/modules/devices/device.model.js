@@ -27,12 +27,7 @@ class DeviceModel {
       params.push(searchTerm, searchTerm);
     }
 
-    if (filters.branch_id) {
-      query += ` AND branch_id = ?`;
-      params.push(filters.branch_id);
-    }
-
-    if (filters.is_active) {
+    if (filters.is_active !== undefined) {
       query += ` AND is_active = ?`;
       params.push(filters.is_active);
     }
@@ -56,14 +51,40 @@ class DeviceModel {
       params.push(searchTerm, searchTerm);
     }
 
-    if (filters.branch_id) {
-      query += ` AND branch_id = ?`;
-      params.push(filters.branch_id);
-    }
-
-    if (filters.is_active) {
+    if (filters.is_active !== undefined) {
       query += ` AND is_active = ?`;
       params.push(filters.is_active);
+    }
+
+    const [rows] = await db.query(query, params);
+    return rows[0].total;
+  }
+
+  // ==============================================================
+  // นับจำนวนสถานะการใช้งาน attendance_logs (stats)
+  async countByStats(companyId, filters, stats) {
+    let query = `SELECT COUNT(*) as total FROM devices d
+      LEFT JOIN attendance_logs al ON d.id = al.device_id
+      WHERE d.company_id = ? AND d.deleted_at IS NULL`;
+    const params = [companyId];
+
+    if (filters.search) {
+      query += ` AND (d.name LIKE ? OR d.hwid LIKE ?)`;
+      const searchTerm = `%${filters.search}%`;
+      params.push(searchTerm, searchTerm);
+    }
+
+    if (filters.is_active !== undefined) {
+      query += ` AND d.is_active = ?`;
+      params.push(filters.is_active);
+    }
+
+    if (stats === "today") {
+      query += ` AND DATE(al.log_timestamp) = CURDATE()`;
+    } else if (stats === "success") {
+      query += ` AND al.status != 'failed'`;
+    } else if (stats === "failed") {
+      query += ` AND al.status = 'failed'`;
     }
 
     const [rows] = await db.query(query, params);

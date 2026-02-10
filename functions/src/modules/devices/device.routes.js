@@ -11,7 +11,7 @@ router.use(protect);
 router
   // Endpoint: /api/devices - จัดการอุปกรณ์
   .route("/")
-  // Endpoint: /api/devices - ดึงรายชื่ออุปกรณ์ทั้งหมด
+  // Endpoint: /api/devices - ดึงรายชื่ออุปกรณ์ทั้งหมด + การค้นหา/กรอง + stats(บันทึกวันนี้/สำเร็จ/ล้มเหลว)
   .get(restrictTo("super_admin", "admin", "manager"), deviceController.getAll)
   // Endpoint: /api/devices - สร้างอุปกรณ์ใหม่
   .post(restrictTo("super_admin", "admin"), deviceController.create);

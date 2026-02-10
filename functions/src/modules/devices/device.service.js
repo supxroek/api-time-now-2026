@@ -21,17 +21,6 @@ class DeviceService {
       }
     }
 
-    //check branch_id belong to company
-    if (cleanData.branch_id) {
-      const branch = await require("../branches/branch.model").findById(
-        cleanData.branch_id,
-        companyId,
-      );
-      if (!branch) {
-        throw new AppError("สาขาที่ระบุไม่มีอยู่ในบริษัทนี้", 400);
-      }
-    }
-
     const dataToCreate = {
       ...cleanData,
       company_id: companyId,
@@ -61,10 +50,10 @@ class DeviceService {
   // ==============================================================
   // ดึงข้อมูลอุปกรณ์ทั้งหมด
   async getAllDevices(companyId, query) {
-    const { page = 1, limit = 20, search, branch_id, is_active } = query;
+    const { page = 1, limit = 20, search, is_active } = query;
     const offset = (page - 1) * limit;
 
-    const filters = { search, branch_id, is_active };
+    const filters = { search, is_active };
 
     const devices = await DeviceModel.findAll(
       companyId,
@@ -76,6 +65,11 @@ class DeviceService {
 
     return {
       devices,
+      stats: {
+        today: await DeviceModel.countByStats(companyId, filters, "today"),
+        success: await DeviceModel.countByStats(companyId, filters, "success"),
+        failed: await DeviceModel.countByStats(companyId, filters, "failed"),
+      },
       meta: {
         total,
         page: Number(page),
@@ -199,9 +193,9 @@ class DeviceService {
   // ==============================================================
   // ดึงรายชื่ออุปกรณ์เฉพาะที่ถูกลบแบบ soft delete
   async getDeletedDevices(companyId, query) {
-    const { page = 1, limit = 20, search, branch_id } = query;
+    const { page = 1, limit = 20, search } = query;
     const offset = (page - 1) * limit;
-    const filters = { search, branch_id };
+    const filters = { search };
 
     const devices = await DeviceModel.findAllDeleted(
       companyId,
