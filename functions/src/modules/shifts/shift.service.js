@@ -5,6 +5,46 @@ const auditRecord = require("../../utils/audit.record");
 // Shift Service
 class ShiftService {
   // ==============================================================
+  // Validate shift times
+  validateShiftTimes(cleanData) {
+    if (
+      !cleanData.start_time &&
+      !cleanData.end_time &&
+      !cleanData.break_start_time &&
+      !cleanData.break_end_time
+    ) {
+      return;
+    }
+
+    // Validate shift start and end times
+    if (
+      cleanData.start_time &&
+      cleanData.end_time &&
+      !cleanData.is_night_shift &&
+      cleanData.start_time >= cleanData.end_time
+    ) {
+      throw new AppError(
+        "เวลาเริ่มต้นกะการทำงานต้องน้อยกว่าเวลาสิ้นสุดกะการทำงาน",
+        400,
+      );
+    }
+
+    // Validate break times
+    if (
+      cleanData.is_break &&
+      !cleanData.is_night_shift &&
+      cleanData.break_start_time &&
+      cleanData.break_end_time &&
+      cleanData.break_start_time >= cleanData.break_end_time
+    ) {
+      throw new AppError(
+        "เวลาเริ่มต้นช่วงพักต้องน้อยกว่าเวลาสิ้นสุดช่วงพัก",
+        400,
+      );
+    }
+  }
+
+  // ==============================================================
   // สร้างกะการทำงานใหม่
   async createShift(user, shiftData, ipAddress) {
     const companyId = user.company_id;
@@ -25,32 +65,8 @@ class ShiftService {
       }
     }
 
-    // ตรวจสอบความถูกต้องของเวลาเริ่มต้นและเวลาสิ้นสุดกะการทำงาน
-    if (
-      (cleanData.start_time && cleanData.end_time) ||
-      (cleanData.break_start_time && cleanData.break_end_time)
-    ) {
-      //ตรวจสอบว่า start_time น้อยกว่า end_time ถ้าไม่ใช่ night shift
-      if (
-        !cleanData.is_night_shift &&
-        cleanData.start_time >= cleanData.end_time
-      ) {
-        throw new AppError(
-          "เวลาเริ่มต้นกะการทำงานต้องน้อยกว่าเวลาสิ้นสุดกะการทำงาน",
-          400,
-        );
-      }
-      // ตรวจสอบว่า break_start_time น้อยกว่า break_end_time ถ้าไม่ใช่ night shift
-      if (
-        !cleanData.is_night_shift &&
-        cleanData.break_start_time >= cleanData.break_end_time
-      ) {
-        throw new AppError(
-          "เวลาเริ่มต้นช่วงพักต้องน้อยกว่าเวลาสิ้นสุดช่วงพัก",
-          400,
-        );
-      }
-    }
+    // Validate shift times
+    this.validateShiftTimes(cleanData);
 
     const dataToCreate = {
       ...cleanData,
@@ -61,6 +77,12 @@ class ShiftService {
       is_night_shift:
         cleanData.is_night_shift === undefined ? 0 : cleanData.is_night_shift,
     };
+
+    // Force break times to null if no break
+    if (!dataToCreate.is_break) {
+      dataToCreate.break_start_time = null;
+      dataToCreate.break_end_time = null;
+    }
 
     const newShiftId = await ShiftModel.create(dataToCreate);
 
@@ -131,6 +153,12 @@ class ShiftService {
 
     delete updateData.id;
     delete updateData.company_id;
+
+    // Force break times to null if is_break is explicitly false
+    if (updateData.is_break === false || updateData.is_break === 0) {
+      updateData.break_start_time = null;
+      updateData.break_end_time = null;
+    }
 
     await ShiftModel.update(id, companyId, updateData);
 
