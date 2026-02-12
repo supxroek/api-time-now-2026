@@ -86,9 +86,9 @@ class DeviceModel {
     if (stats === "today") {
       query += ` AND DATE(al.log_timestamp) = CURDATE()`;
     } else if (stats === "success") {
-      query += ` AND al.status != 'failed'`;
+      query += ` AND DATE(al.log_timestamp) = CURDATE() AND al.status != 'failed'`;
     } else if (stats === "failed") {
-      query += ` AND al.status = 'failed'`;
+      query += ` AND DATE(al.log_timestamp) = CURDATE() AND al.status = 'failed'`;
     }
 
     const [rows] = await db.query(query, params);
