@@ -16,6 +16,17 @@ class RequestController {
       data: result,
     });
   });
+
+  // ==============================================================
+  // สรุปสถิติ
+  getStats = catchAsync(async (req, res, next) => {
+    const stats = await RequestService.getStats(req.user.company_id);
+
+    res.status(200).json({
+      status: "success",
+      data: stats,
+    });
+  });
 }
 
 module.exports = new RequestController();

@@ -7,6 +7,13 @@ const router = express.Router();
 // ป้องกันทุก Route ด้วย JWT Auth
 router.use(protect);
 
+// Request Stats Route
+router.get(
+  "/stats",
+  restrictTo("super_admin", "admin", "manager"),
+  controller.getStats,
+);
+
 // Request History Routes
 router
   // Endpoint: /api/requests - ดึงประวัติคำขอทั้งหมด
