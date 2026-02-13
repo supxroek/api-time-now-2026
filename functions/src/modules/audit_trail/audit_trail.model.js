@@ -131,6 +131,23 @@ class AuditTrailModel {
     const [rows] = await db.query(query, [id, companyId]);
     return rows[0];
   }
+
+  // ==============================================================
+  // ดึงสถิติการกระทำต่างๆ (INSERT, UPDATE, DELETE) สำหรับ Dashboard
+  async getStats(companyId) {
+    const query = `
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN action_type = 'INSERT' THEN 1 ELSE 0 END) as inserts,
+        SUM(CASE WHEN action_type = 'UPDATE' THEN 1 ELSE 0 END) as updates,
+        SUM(CASE WHEN action_type = 'DELETE' THEN 1 ELSE 0 END) as deletes
+      FROM audit_trail
+      WHERE company_id = ?
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows[0];
+  }
 }
 
 module.exports = new AuditTrailModel();

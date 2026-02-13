@@ -35,12 +35,16 @@ class AuditTrailService {
     );
     const total = await AuditTrailModel.countAll(user.company_id, filters);
 
+    // stats
+    const stats = await AuditTrailModel.getStats(user.company_id);
+
     return {
       total,
       page: Number(page),
       limit: Number(limit),
       total_pages: Math.ceil(total / limit),
       data: logs,
+      stats,
     };
   }
 
