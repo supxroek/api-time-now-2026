@@ -9,6 +9,7 @@ class AuditTrailModel {
       SELECT 
         at.*,
         u.email as user_email,
+        u.role as user_role,
         e.name as user_name
       FROM audit_trail at
       LEFT JOIN users u ON at.user_id = u.id
@@ -120,6 +121,7 @@ class AuditTrailModel {
       SELECT 
         at.*,
         u.email as user_email,
+        u.role as user_role,
         e.name as user_name
       FROM audit_trail at
       LEFT JOIN users u ON at.user_id = u.id
