@@ -14,4 +14,15 @@ router
   // Endpoint: /api/attendance-logs - ดึงบันทึกการเข้าออกงานทั้งหมด
   .get(restrictTo("super_admin", "admin", "manager"), controller.getAll);
 
+router
+  .route("/summary")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    controller.getDailySummary,
+  );
+
+router
+  .route("/employee/:employeeId/history")
+  .get(restrictTo("super_admin", "admin", "manager"), controller.getHistory);
+
 module.exports = router;

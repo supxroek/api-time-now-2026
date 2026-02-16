@@ -12,6 +12,23 @@ class AttendanceLogController {
     );
     res.status(200).json({ status: "success", data: result });
   });
+
+  getHistory = catchAsync(async (req, res, next) => {
+    const result = await AttendanceLogService.getEmployeeAttendanceHistory(
+      req.user.company_id,
+      req.params.employeeId,
+      req.query,
+    );
+    res.status(200).json({ status: "success", data: result });
+  });
+
+  getDailySummary = catchAsync(async (req, res, next) => {
+    const result = await AttendanceLogService.getDailySummary(
+      req.user.company_id,
+      req.query,
+    );
+    res.status(200).json({ status: "success", data: result });
+  });
 }
 
 module.exports = new AttendanceLogController();
