@@ -57,7 +57,12 @@ class AttendanceLogModel {
 
   // ==============================================================
   // ดึงสถิติการเข้าออกงาน
-  async getStats(companyId) {
+  async getStats(companyId, filters = {}) {
+    const targetDate =
+      filters.start_date ||
+      filters.end_date ||
+      new Date().toISOString().split("T")[0];
+
     const query = `
       SELECT
     -- นับจำนวนพนักงานทั้งหมดในบริษัท
@@ -67,27 +72,33 @@ class AttendanceLogModel {
      FROM attendance_logs al
      JOIN employees e2 ON al.employee_id = e2.id
      WHERE e2.company_id = c.company_id
-       AND DATE(al.log_timestamp) = CURDATE()
+       AND DATE(al.log_timestamp) = ?
        AND al.status IS NOT NULL AND al.status != 'null') AS came_to_work,
     -- นับจำนวนพนักงานที่มาทำงานสายในวันนี้ (เช็คอินสาย)
   (SELECT COUNT(DISTINCT al.employee_id)
      FROM attendance_logs al
      JOIN employees e3 ON al.employee_id = e3.id
      WHERE e3.company_id = c.company_id
-       AND DATE(al.log_timestamp) = CURDATE()
+       AND DATE(al.log_timestamp) = ?
        AND (al.status = 'late')) AS late,
     -- นับจำนวนพนักงานที่ยังไม่มาทำงานในวันนี้ (มีตารางเวลาเช็คอินแต่ยังไม่เช็คอิน)
   (SELECT COUNT(*)
      FROM rosters r
      JOIN employees e4 ON r.employee_id = e4.id
      LEFT JOIN attendance_logs al2 ON al2.employee_id = r.employee_id
-       AND DATE(al2.log_timestamp) = CURDATE()
+       AND DATE(al2.log_timestamp) = ?
      WHERE e4.company_id = c.company_id
-       AND r.work_date = CURDATE()
+       AND r.work_date = ?
        AND al2.id IS NULL) AS not_came_to_work
 FROM (SELECT ? AS company_id) c;
     `;
-    const [rows] = await db.query(query, [companyId]);
+    const [rows] = await db.query(query, [
+      targetDate,
+      targetDate,
+      targetDate,
+      targetDate,
+      companyId,
+    ]);
     const stats = rows[0];
     stats.absent = stats.total_employees - stats.came_to_work;
     return stats;

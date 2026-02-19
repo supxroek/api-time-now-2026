@@ -35,7 +35,7 @@ class AttendanceLogService {
     const total = await AttendanceLogModel.countAll(companyId, filters);
 
     // stats: สถิติการเข้าออกงาน เช่น (พนักงานทั้งหมด, มาทำงาน, ขาดงาน, มาสาย) ในวันนั้นๆ
-    const stats = await AttendanceLogModel.getStats(companyId);
+    const stats = await AttendanceLogModel.getStats(companyId, filters);
 
     return {
       logs,
