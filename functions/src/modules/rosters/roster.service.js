@@ -1,6 +1,7 @@
 const RosterModel = require("./roster.model");
 const AppError = require("../../utils/AppError");
 const auditRecord = require("../../utils/audit.record");
+const db = require("../../config/db.config");
 
 // Roster Service
 class RosterService {
@@ -204,43 +205,87 @@ class RosterService {
       effectiveFromDate = minDate;
     }
 
-    const employee = await RosterModel.findEmployeeById(employeeId, companyId);
-    if (!employee) {
-      throw new AppError("ไม่พบพนักงานในบริษัทนี้", 404);
-    }
+    const connection = await db.getConnection();
+    let deletableRosters = [];
+    let skippedRosters = [];
+    let deletedCount = 0;
 
-    const oldRosters = await RosterModel.findFutureByEmployee(
-      companyId,
-      employeeId,
-      effectiveFromDate,
-    );
+    try {
+      await connection.beginTransaction();
 
-    if (oldRosters.length === 0) {
-      return { deleted_count: 0 };
-    }
+      const employee = await RosterModel.findEmployeeById(
+        employeeId,
+        companyId,
+        connection,
+      );
+      if (!employee) {
+        throw new AppError("ไม่พบพนักงานในบริษัทนี้", 404);
+      }
 
-    const deletedCount = await RosterModel.deleteFutureByEmployee(
-      companyId,
-      employeeId,
-      effectiveFromDate,
-    );
+      const futureRosters = await RosterModel.findFutureByEmployee(
+        companyId,
+        employeeId,
+        effectiveFromDate,
+        connection,
+      );
 
-    await Promise.allSettled(
-      oldRosters.map((roster) =>
-        auditRecord({
-          userId: user.id,
+      if (futureRosters.length === 0) {
+        await connection.commit();
+        return {
+          deleted_count: 0,
+          skipped_count: 0,
+          total_candidates: 0,
+          skipped_roster_ids: [],
+        };
+      }
+
+      deletableRosters = futureRosters.filter(
+        (roster) => Number(roster.attendance_count || 0) === 0,
+      );
+      skippedRosters = futureRosters.filter(
+        (roster) => Number(roster.attendance_count || 0) > 0,
+      );
+
+      if (deletableRosters.length > 0) {
+        deletedCount = await RosterModel.deleteFutureByEmployeeIds(
           companyId,
-          action: "DELETE",
-          table: "rosters",
-          recordId: roster.id,
-          oldVal: roster,
-          newVal: null,
-          ipAddress,
-        }),
-      ),
-    );
+          employeeId,
+          deletableRosters.map((roster) => roster.id),
+          connection,
+        );
+      }
 
-    return { deleted_count: deletedCount };
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    if (deletableRosters.length > 0) {
+      await Promise.allSettled(
+        deletableRosters.map((roster) =>
+          auditRecord({
+            userId: user.id,
+            companyId,
+            action: "DELETE",
+            table: "rosters",
+            recordId: roster.id,
+            oldVal: roster,
+            newVal: null,
+            ipAddress,
+          }),
+        ),
+      );
+    }
+
+    return {
+      deleted_count: deletedCount,
+      skipped_count: skippedRosters.length,
+      total_candidates: deletableRosters.length + skippedRosters.length,
+      skipped_roster_ids: skippedRosters.map((roster) => roster.id),
+    };
   }
 }
 

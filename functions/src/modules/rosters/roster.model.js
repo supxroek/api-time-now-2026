@@ -32,9 +32,34 @@ class RosterModel {
   // ==============================================================
   // ดึงข้อมูลตารางเวรทั้งหมด พร้อม Pagination และ Filters
   async findAll(companyId, filters = {}, limit = 50, offset = 0) {
-    // Need to join with employees to filter by company_id correctly
     let query = `
-      SELECT r.*, e.*, e.name as employee_name, s.*, s.name as shift_name
+      SELECT
+        r.id,
+        r.employee_id,
+        r.shift_id,
+        r.work_date,
+        r.is_ot_allowed,
+        r.is_public_holiday,
+        r.leave_status,
+        r.leave_hours_data,
+        r.leave_id_ref,
+
+        e.id AS employee_record_id,
+        e.employee_code,
+        e.name AS employee_name,
+        e.image_url AS employee_avatar,
+        e.department_id,
+        e.status AS employee_status,
+
+        s.id AS shift_record_id,
+        s.name AS shift_name,
+        s.type AS shift_type,
+        s.start_time AS shift_start_time,
+        s.end_time AS shift_end_time,
+        s.is_break,
+        s.break_start_time,
+        s.break_end_time,
+        s.is_night_shift
       FROM rosters r
       JOIN employees e ON r.employee_id = e.id
       LEFT JOIN shifts s ON r.shift_id = s.id
@@ -113,17 +138,17 @@ class RosterModel {
 
   // ==============================================================
   // ดึงข้อมูลพนักงานตาม ID (ใช้ตรวจสอบความเป็นเจ้าของ)
-  async findEmployeeById(employeeId, companyId) {
+  async findEmployeeById(employeeId, companyId, executor = db) {
     const query = `SELECT * FROM employees WHERE id = ? AND company_id = ?`;
-    const [rows] = await db.query(query, [employeeId, companyId]);
+    const [rows] = await executor.query(query, [employeeId, companyId]);
     return rows[0];
   }
 
   // ==============================================================
   // ดึงข้อมูลกะการทำงานตาม ID (ใช้ตรวจสอบความเป็นเจ้าของ)
-  async findShiftById(shiftId, companyId) {
+  async findShiftById(shiftId, companyId, executor = db) {
     const query = `SELECT * FROM shifts WHERE id = ? AND company_id = ?`;
-    const [rows] = await db.query(query, [shiftId, companyId]);
+    const [rows] = await executor.query(query, [shiftId, companyId]);
     return rows[0];
   }
 
@@ -164,23 +189,31 @@ class RosterModel {
 
   // ==============================================================
   // ค้นหาตารางเวรของพนักงานตั้งแต่วันที่กำหนดเป็นต้นไป
-  async findFutureByEmployee(companyId, employeeId, fromDate) {
+  async findFutureByEmployee(companyId, employeeId, fromDate, executor = db) {
     const query = `
-      SELECT r.*
+      SELECT
+        r.*,
+        COUNT(al.id) AS attendance_count
       FROM rosters r
       JOIN employees e ON r.employee_id = e.id
+      LEFT JOIN attendance_logs al ON al.roster_id = r.id
       WHERE e.company_id = ?
         AND r.employee_id = ?
         AND r.work_date >= ?
+      GROUP BY r.id
       ORDER BY r.work_date ASC
     `;
-    const [rows] = await db.query(query, [companyId, employeeId, fromDate]);
+    const [rows] = await executor.query(query, [
+      companyId,
+      employeeId,
+      fromDate,
+    ]);
     return rows;
   }
 
   // ==============================================================
   // ลบตารางเวรของพนักงานตั้งแต่วันที่กำหนดเป็นต้นไป
-  async deleteFutureByEmployee(companyId, employeeId, fromDate) {
+  async deleteFutureByEmployee(companyId, employeeId, fromDate, executor = db) {
     const query = `
       DELETE r
       FROM rosters r
@@ -189,7 +222,39 @@ class RosterModel {
         AND r.employee_id = ?
         AND r.work_date >= ?
     `;
-    const [result] = await db.query(query, [companyId, employeeId, fromDate]);
+    const [result] = await executor.query(query, [
+      companyId,
+      employeeId,
+      fromDate,
+    ]);
+    return result.affectedRows || 0;
+  }
+
+  // ==============================================================
+  // ลบตารางเวรของพนักงานตามรายการ ID ที่ระบุ
+  async deleteFutureByEmployeeIds(
+    companyId,
+    employeeId,
+    rosterIds,
+    executor = db,
+  ) {
+    if (!Array.isArray(rosterIds) || rosterIds.length === 0) return 0;
+
+    const placeholders = rosterIds.map(() => "?").join(", ");
+    const query = `
+      DELETE r
+      FROM rosters r
+      JOIN employees e ON r.employee_id = e.id
+      WHERE e.company_id = ?
+        AND r.employee_id = ?
+        AND r.id IN (${placeholders})
+    `;
+
+    const [result] = await executor.query(query, [
+      companyId,
+      employeeId,
+      ...rosterIds,
+    ]);
     return result.affectedRows || 0;
   }
 }
