@@ -24,6 +24,9 @@ const attendanceLogRoutes = require("./modules/attendance_logs/attendance_log.ro
 const requestRoutes = require("./modules/requests/request.routes");
 const auditTrailRoutes = require("./modules/audit_trail/audit_trail.routes");
 const companySettingRoutes = require("./modules/comapny_settings/comapny_settings.routes");
+const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
+const userRoutes = require("./modules/users/user.routes");
+const rosterManageRoutes = require("./modules/roster_manage/roster_manage.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -46,6 +49,9 @@ router.use(`${API_VERSION}/attendance-logs`, attendanceLogRoutes);
 router.use(`${API_VERSION}/requests`, requestRoutes);
 router.use(`${API_VERSION}/audit-trails`, auditTrailRoutes);
 router.use(`${API_VERSION}/company-settings`, companySettingRoutes);
+router.use(`${API_VERSION}/dashboard`, dashboardRoutes);
+router.use(`${API_VERSION}/users`, userRoutes);
+router.use(`${API_VERSION}/roster-manage`, rosterManageRoutes);
 
 /**
  * API Info route
