@@ -161,6 +161,37 @@ class RosterModel {
     `;
     await db.query(query, [id, companyId]);
   }
+
+  // ==============================================================
+  // ค้นหาตารางเวรของพนักงานตั้งแต่วันที่กำหนดเป็นต้นไป
+  async findFutureByEmployee(companyId, employeeId, fromDate) {
+    const query = `
+      SELECT r.*
+      FROM rosters r
+      JOIN employees e ON r.employee_id = e.id
+      WHERE e.company_id = ?
+        AND r.employee_id = ?
+        AND r.work_date >= ?
+      ORDER BY r.work_date ASC
+    `;
+    const [rows] = await db.query(query, [companyId, employeeId, fromDate]);
+    return rows;
+  }
+
+  // ==============================================================
+  // ลบตารางเวรของพนักงานตั้งแต่วันที่กำหนดเป็นต้นไป
+  async deleteFutureByEmployee(companyId, employeeId, fromDate) {
+    const query = `
+      DELETE r
+      FROM rosters r
+      JOIN employees e ON r.employee_id = e.id
+      WHERE e.company_id = ?
+        AND r.employee_id = ?
+        AND r.work_date >= ?
+    `;
+    const [result] = await db.query(query, [companyId, employeeId, fromDate]);
+    return result.affectedRows || 0;
+  }
 }
 
 module.exports = new RosterModel();

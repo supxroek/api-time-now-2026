@@ -185,6 +185,63 @@ class RosterService {
       console.warn("Audit log failed:", err);
     }
   }
+
+  // ==============================================================
+  // ลบตารางเวรของพนักงานตั้งแต่วันที่กำหนดเป็นต้นไป
+  async deleteFutureRostersByEmployee(user, employeeId, fromDate, ipAddress) {
+    const companyId = user.company_id;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = tomorrow.toISOString().split("T")[0];
+    const targetDate = fromDate || minDate;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      throw new AppError("รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)", 400);
+    }
+
+    let effectiveFromDate = targetDate;
+    if (effectiveFromDate < minDate) {
+      effectiveFromDate = minDate;
+    }
+
+    const employee = await RosterModel.findEmployeeById(employeeId, companyId);
+    if (!employee) {
+      throw new AppError("ไม่พบพนักงานในบริษัทนี้", 404);
+    }
+
+    const oldRosters = await RosterModel.findFutureByEmployee(
+      companyId,
+      employeeId,
+      effectiveFromDate,
+    );
+
+    if (oldRosters.length === 0) {
+      return { deleted_count: 0 };
+    }
+
+    const deletedCount = await RosterModel.deleteFutureByEmployee(
+      companyId,
+      employeeId,
+      effectiveFromDate,
+    );
+
+    await Promise.allSettled(
+      oldRosters.map((roster) =>
+        auditRecord({
+          userId: user.id,
+          companyId,
+          action: "DELETE",
+          table: "rosters",
+          recordId: roster.id,
+          oldVal: roster,
+          newVal: null,
+          ipAddress,
+        }),
+      ),
+    );
+
+    return { deleted_count: deletedCount };
+  }
 }
 
 module.exports = new RosterService();

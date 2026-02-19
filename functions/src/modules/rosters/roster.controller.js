@@ -75,6 +75,25 @@ class RosterController {
       data: null,
     });
   });
+
+  // ==============================================================
+  // ลบตารางเวรของพนักงานตั้งแต่วันที่กำหนดเป็นต้นไป
+  deleteFutureByEmployee = catchAsync(async (req, res, next) => {
+    const { employeeId } = req.params;
+    const { from_date } = req.query;
+
+    const result = await RosterService.deleteFutureRostersByEmployee(
+      req.user,
+      employeeId,
+      from_date,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
 }
 
 module.exports = new RosterController();

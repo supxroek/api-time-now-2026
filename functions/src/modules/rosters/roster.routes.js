@@ -17,6 +17,14 @@ router
   .post(restrictTo("super_admin", "admin"), rosterController.create);
 
 router
+  // Endpoint: /api/rosters/employee/:employeeId/future - ลบตารางเวรตั้งแต่วันที่กำหนดเป็นต้นไป
+  .route("/employee/:employeeId/future")
+  .delete(
+    restrictTo("super_admin", "admin"),
+    rosterController.deleteFutureByEmployee,
+  );
+
+router
   // Endpoint: /api/rosters/:id - จัดการตารางเวรรายรายการ
   .route("/:id")
   // Endpoint: /api/rosters/:id - ดึงข้อมูลตารางเวร
