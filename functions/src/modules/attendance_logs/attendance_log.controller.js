@@ -4,6 +4,17 @@ const catchAsync = require("../../utils/catchAsync");
 // Attendance Log Controller
 class AttendanceLogController {
   // ==============================================================
+  // บันทึกการเข้าออกงาน
+  create = catchAsync(async (req, res, next) => {
+    const result = await AttendanceLogService.createAttendanceLog(
+      req.user.company_id,
+      req.body,
+    );
+
+    res.status(201).json({ status: "success", data: { log: result } });
+  });
+
+  // ==============================================================
   // ดึงบันทึกการเข้าออกงานทั้งหมด
   getAll = catchAsync(async (req, res, next) => {
     const result = await AttendanceLogService.getAttendanceLogs(

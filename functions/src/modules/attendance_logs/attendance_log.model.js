@@ -3,6 +3,76 @@ const db = require("../../config/db.config");
 // Attendance Log Model
 class AttendanceLogModel {
   // ==============================================================
+  // ค้นหาพนักงานที่ยังใช้งานได้
+  async findActiveEmployeeById(companyId, employeeId) {
+    const query = `
+      SELECT id, default_shift_id, status, deleted_at, resign_date
+      FROM employees
+      WHERE company_id = ?
+        AND id = ?
+        AND deleted_at IS NULL
+        AND status = 'active'
+        AND resign_date IS NULL
+      LIMIT 1
+    `;
+    const [rows] = await db.query(query, [companyId, employeeId]);
+    return rows[0] || null;
+  }
+
+  // ==============================================================
+  // ค้นหา roster ตามพนักงานและวันที่
+  async findRosterByEmployeeAndDate(employeeId, workDate) {
+    const query = `
+      SELECT *
+      FROM rosters
+      WHERE employee_id = ? AND work_date = ?
+      LIMIT 1
+    `;
+    const [rows] = await db.query(query, [employeeId, workDate]);
+    return rows[0] || null;
+  }
+
+  // ==============================================================
+  // สร้าง roster สำหรับลงเวลาอัตโนมัติ
+  async createRosterForAttendance({ employee_id, shift_id, work_date }) {
+    const query = `
+      INSERT INTO rosters (employee_id, shift_id, work_date, is_ot_allowed, is_public_holiday, leave_status)
+      VALUES (?, ?, ?, 0, 0, 'none')
+    `;
+    const [result] = await db.query(query, [employee_id, shift_id, work_date]);
+    return result.insertId;
+  }
+
+  // ==============================================================
+  // สร้าง attendance log
+  async createAttendanceLog(data) {
+    const query = `
+      INSERT INTO attendance_logs (
+        employee_id,
+        roster_id,
+        device_id,
+        log_type,
+        log_timestamp,
+        latitude,
+        longitude,
+        status
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const [result] = await db.query(query, [
+      data.employee_id,
+      data.roster_id,
+      data.device_id || null,
+      data.log_type,
+      data.log_timestamp,
+      data.latitude || null,
+      data.longitude || null,
+      data.status || null,
+    ]);
+    return result.insertId;
+  }
+
+  // ==============================================================
   // ค้นหาบันทึกการเข้าออกงานทั้งหมด
   async findAll(companyId, filters = {}, limit = 50, offset = 0) {
     let query = `
@@ -65,13 +135,21 @@ class AttendanceLogModel {
 
     const query = `
       SELECT
-    -- นับจำนวนพนักงานทั้งหมดในบริษัท
-  (SELECT COUNT(*) FROM employees e WHERE e.company_id = c.company_id) AS total_employees,
+    -- นับจำนวนพนักงานที่ active เท่านั้น
+  (SELECT COUNT(*)
+     FROM employees e
+     WHERE e.company_id = c.company_id
+       AND e.deleted_at IS NULL
+       AND e.status = 'active'
+       AND e.resign_date IS NULL) AS total_employees,
     -- นับจำนวนพนักงานที่มาทำงานในวันนี้ (เช็คอินแล้ว)
   (SELECT COUNT(DISTINCT al.employee_id)
      FROM attendance_logs al
      JOIN employees e2 ON al.employee_id = e2.id
      WHERE e2.company_id = c.company_id
+       AND e2.deleted_at IS NULL
+       AND e2.status = 'active'
+       AND e2.resign_date IS NULL
        AND DATE(al.log_timestamp) = ?
        AND al.status IS NOT NULL AND al.status != 'null') AS came_to_work,
     -- นับจำนวนพนักงานที่มาทำงานสายในวันนี้ (เช็คอินสาย)
@@ -79,6 +157,9 @@ class AttendanceLogModel {
      FROM attendance_logs al
      JOIN employees e3 ON al.employee_id = e3.id
      WHERE e3.company_id = c.company_id
+       AND e3.deleted_at IS NULL
+       AND e3.status = 'active'
+       AND e3.resign_date IS NULL
        AND DATE(al.log_timestamp) = ?
        AND (al.status = 'late')) AS late,
     -- นับจำนวนพนักงานที่ยังไม่มาทำงานในวันนี้ (มีตารางเวลาเช็คอินแต่ยังไม่เช็คอิน)
@@ -88,6 +169,9 @@ class AttendanceLogModel {
      LEFT JOIN attendance_logs al2 ON al2.employee_id = r.employee_id
        AND DATE(al2.log_timestamp) = ?
      WHERE e4.company_id = c.company_id
+       AND e4.deleted_at IS NULL
+       AND e4.status = 'active'
+       AND e4.resign_date IS NULL
        AND r.work_date = ?
        AND al2.id IS NULL) AS not_came_to_work
 FROM (SELECT ? AS company_id) c;

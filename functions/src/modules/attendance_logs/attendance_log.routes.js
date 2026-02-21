@@ -11,6 +11,8 @@ router.use(protect);
 router
   // Endpoint: /api/attendance-logs - จัดการบันทึกการเข้าออกงาน
   .route("/")
+  // Endpoint: /api/attendance-logs - บันทึกการเข้าออกงาน
+  .post(restrictTo("super_admin", "admin", "manager"), controller.create)
   // Endpoint: /api/attendance-logs - ดึงบันทึกการเข้าออกงานทั้งหมด
   .get(restrictTo("super_admin", "admin", "manager"), controller.getAll);
 
