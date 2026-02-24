@@ -42,7 +42,6 @@ class RosterModel {
         r.is_public_holiday,
         r.leave_status,
         r.leave_hours_data,
-        r.leave_id_ref,
 
         e.id AS employee_record_id,
         e.employee_code,

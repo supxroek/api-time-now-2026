@@ -27,6 +27,7 @@ const companySettingRoutes = require("./modules/comapny_settings/comapny_setting
 const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 const userRoutes = require("./modules/users/user.routes");
 const rosterManageRoutes = require("./modules/roster_manage/roster_manage.routes");
+const leaveHubIntegrationRoutes = require("./modules/leaveHubIntegration/leaveHubIntegration.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -52,6 +53,7 @@ router.use(`${API_VERSION}/company-settings`, companySettingRoutes);
 router.use(`${API_VERSION}/dashboard`, dashboardRoutes);
 router.use(`${API_VERSION}/users`, userRoutes);
 router.use(`${API_VERSION}/roster-manage`, rosterManageRoutes);
+router.use(`${API_VERSION}/leave-hub-integration`, leaveHubIntegrationRoutes);
 
 /**
  * API Info route

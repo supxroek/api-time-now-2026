@@ -4,6 +4,16 @@ const auditRecord = require("../../utils/audit.record");
 
 // Company Service
 class CompanyService {
+  sanitizeCompany(company) {
+    if (!company) {
+      return company;
+    }
+
+    const sanitizedCompany = { ...company };
+    delete sanitizedCompany.leave_hub_password;
+    return sanitizedCompany;
+  }
+
   // ==============================================================
   // ดึงข้อมูลโปรไฟล์บริษัท
   async getCompanyProfile(companyId) {
@@ -11,7 +21,7 @@ class CompanyService {
     if (!company) {
       throw new AppError("ไม่พบบริษัท", 404);
     }
-    return company;
+    return this.sanitizeCompany(company);
   }
 
   // ==============================================================
@@ -52,7 +62,7 @@ class CompanyService {
     });
 
     if (Object.keys(cleanData).length === 0) {
-      return oldCompany;
+      return this.sanitizeCompany(oldCompany);
     }
 
     // 3. อัปเดตข้อมูลบริษัท
@@ -75,7 +85,7 @@ class CompanyService {
       console.warn("Audit log failed:", err);
     }
 
-    return newCompany;
+    return this.sanitizeCompany(newCompany);
   }
 }
 
