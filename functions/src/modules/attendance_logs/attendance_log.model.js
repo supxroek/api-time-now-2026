@@ -4,7 +4,7 @@ const db = require("../../config/db.config");
 class AttendanceLogModel {
   // ==============================================================
   // ค้นหาพนักงานที่ยังใช้งานได้
-  async findActiveEmployeeById(companyId, employeeId) {
+  async findActiveEmployeeById(companyId, employeeId, executor = db) {
     const query = `
       SELECT id, default_shift_id, status, deleted_at, resign_date
       FROM employees
@@ -15,61 +15,171 @@ class AttendanceLogModel {
         AND resign_date IS NULL
       LIMIT 1
     `;
-    const [rows] = await db.query(query, [companyId, employeeId]);
+    const [rows] = await executor.query(query, [companyId, employeeId]);
     return rows[0] || null;
   }
 
   // ==============================================================
   // ค้นหา roster ตามพนักงานและวันที่
-  async findRosterByEmployeeAndDate(employeeId, workDate) {
+  async findRosterByEmployeeAndDate(
+    companyId,
+    employeeId,
+    workDate,
+    executor = db,
+  ) {
     const query = `
-      SELECT *
-      FROM rosters
-      WHERE employee_id = ? AND work_date = ?
+      SELECT r.*
+      FROM rosters r
+      JOIN employees e ON r.employee_id = e.id
+      WHERE e.company_id = ?
+        AND r.employee_id = ?
+        AND r.work_date = ?
       LIMIT 1
     `;
-    const [rows] = await db.query(query, [employeeId, workDate]);
+    const [rows] = await executor.query(query, [
+      companyId,
+      employeeId,
+      workDate,
+    ]);
     return rows[0] || null;
   }
 
   // ==============================================================
   // สร้าง roster สำหรับลงเวลาอัตโนมัติ
-  async createRosterForAttendance({ employee_id, shift_id, work_date }) {
+  async createRosterForAttendance(data, executor = db) {
     const query = `
-      INSERT INTO rosters (employee_id, shift_id, work_date, is_ot_allowed, is_public_holiday, leave_status)
-      VALUES (?, ?, ?, 0, 0, 'none')
+      INSERT INTO rosters (
+        company_id,
+        employee_id,
+        shift_id,
+        work_date,
+        is_ot_allowed,
+        is_public_holiday,
+        leave_status,
+        is_holiday_swap,
+        is_compensatory,
+        source_system,
+        base_day_type
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await db.query(query, [employee_id, shift_id, work_date]);
+
+    const [result] = await executor.query(query, [
+      data.company_id,
+      data.employee_id,
+      data.shift_id,
+      data.work_date,
+      data.is_ot_allowed ?? 0,
+      data.is_public_holiday ?? 0,
+      data.leave_status || "none",
+      data.is_holiday_swap ?? 0,
+      data.is_compensatory ?? 0,
+      data.source_system || "local",
+      data.base_day_type || null,
+    ]);
     return result.insertId;
   }
 
   // ==============================================================
   // สร้าง attendance log
-  async createAttendanceLog(data) {
+  async createAttendanceLog(data, executor = db) {
     const query = `
       INSERT INTO attendance_logs (
+        company_id,
         employee_id,
         roster_id,
         device_id,
         log_type,
         log_timestamp,
-        latitude,
-        longitude,
         status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await db.query(query, [
+    const [result] = await executor.query(query, [
+      data.company_id,
       data.employee_id,
       data.roster_id,
       data.device_id || null,
       data.log_type,
       data.log_timestamp,
-      data.latitude || null,
-      data.longitude || null,
       data.status || null,
     ]);
     return result.insertId;
+  }
+
+  // ==============================================================
+  // ค้นหา log ที่อาจซ้ำจากการ retry (Idempotent guard)
+  async findPotentialDuplicateLog(
+    companyId,
+    employeeId,
+    rosterId,
+    logType,
+    logTimestamp,
+    deviceId,
+    windowSeconds = 120,
+    executor = db,
+  ) {
+    const query = `
+      SELECT
+        al.*,
+        ABS(TIMESTAMPDIFF(SECOND, al.log_timestamp, ?)) AS diff_seconds
+      FROM attendance_logs al
+      WHERE al.company_id = ?
+        AND al.employee_id = ?
+        AND al.roster_id = ?
+        AND al.log_type = ?
+        AND ABS(TIMESTAMPDIFF(SECOND, al.log_timestamp, ?)) <= ?
+        AND (
+          (al.device_id IS NULL AND ? IS NULL)
+          OR al.device_id = ?
+        )
+      ORDER BY diff_seconds ASC, al.id DESC
+      LIMIT 1
+      FOR UPDATE
+    `;
+
+    const [rows] = await executor.query(query, [
+      logTimestamp,
+      companyId,
+      employeeId,
+      rosterId,
+      logType,
+      logTimestamp,
+      windowSeconds,
+      deviceId || null,
+      deviceId || null,
+    ]);
+
+    return rows[0] || null;
+  }
+
+  // ==============================================================
+  // ค้นหา log ล่าสุดตามประเภท ใน roster เดียวกัน
+  async findLatestLogByType(
+    companyId,
+    employeeId,
+    rosterId,
+    logType,
+    executor = db,
+  ) {
+    const query = `
+      SELECT id, log_type, log_timestamp, status
+      FROM attendance_logs
+      WHERE company_id = ?
+        AND employee_id = ?
+        AND roster_id = ?
+        AND log_type = ?
+      ORDER BY log_timestamp DESC, id DESC
+      LIMIT 1
+    `;
+
+    const [rows] = await executor.query(query, [
+      companyId,
+      employeeId,
+      rosterId,
+      logType,
+    ]);
+    return rows[0] || null;
   }
 
   // ==============================================================
@@ -83,8 +193,9 @@ class AttendanceLogModel {
       JOIN employees e ON al.employee_id = e.id
       LEFT JOIN devices d ON al.device_id = d.id
       WHERE e.company_id = ?
+        AND al.company_id = ?
     `;
-    const params = [companyId];
+    const params = [companyId, companyId];
 
     // การกรองข้อมูล
     // หากมีการระบุ employee_id
@@ -196,8 +307,9 @@ FROM (SELECT ? AS company_id) c;
       FROM attendance_logs al
       JOIN employees e ON al.employee_id = e.id
       WHERE e.company_id = ?
+        AND al.company_id = ?
     `;
-    const params = [companyId];
+    const params = [companyId, companyId];
 
     if (filters.employee_id) {
       query += ` AND al.employee_id = ?`;

@@ -35,13 +35,19 @@ class RosterModel {
     let query = `
       SELECT
         r.id,
+        r.company_id,
         r.employee_id,
         r.shift_id,
         r.work_date,
         r.is_ot_allowed,
         r.is_public_holiday,
+        r.is_holiday_swap,
+        r.is_compensatory,
         r.leave_status,
         r.leave_hours_data,
+        r.source_system,
+        r.base_day_type,
+        r.resolved_at,
 
         e.id AS employee_record_id,
         e.employee_code,

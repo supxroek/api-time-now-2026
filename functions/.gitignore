@@ -140,7 +140,7 @@ junit-reports/
 *.sqlite
 *.sqlite3
 *.db
-*.sql
+# *.sql
 dump.rdb
 
 # Misc

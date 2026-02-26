@@ -49,6 +49,20 @@ class LeaveHubIntegrationController {
       data: result,
     });
   });
+
+  // ==============================================================
+  // ดึงข้อมูล context สำหรับแสดงตารางเวรจาก LeaveHub
+  getRosterContext = catchAsync(async (req, res, _next) => {
+    const result = await LeaveHubIntegrationService.getRosterContext(
+      req.user,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
 }
 
 module.exports = new LeaveHubIntegrationController();

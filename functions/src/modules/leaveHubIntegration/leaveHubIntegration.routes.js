@@ -18,4 +18,11 @@ router
   .route("/disconnect")
   .post(restrictTo("super_admin", "admin"), controller.disconnectLeaveHub);
 
+router
+  .route("/roster-context")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    controller.getRosterContext,
+  );
+
 module.exports = router;

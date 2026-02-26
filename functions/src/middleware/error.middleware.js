@@ -33,13 +33,18 @@ const sendErrorDev = (err, res) => {
   if (err.originalError?.response?.data) {
     console.error(
       "LINE API Error Details:",
-      JSON.stringify(err.originalError.response.data, null, 2)
+      JSON.stringify(err.originalError.response.data, null, 2),
     );
   }
   res.status(err.statusCode).json({
-    status: err.status,
-    error: err,
+    status: "error",
+    error: {
+      code: err.code || "INTERNAL_ERROR",
+      message: err.message,
+      details: err.details || {},
+    },
     message: err.message,
+    raw_error: err,
     stack: err.stack,
   });
 };
@@ -48,7 +53,12 @@ const sendErrorProd = (err, res) => {
   // ข้อผิดพลาดที่คาดการณ์ได้ : ส่งข้อความข้อผิดพลาดไปยังไคลเอนต์
   if (err.isOperational) {
     res.status(err.statusCode).json({
-      status: err.status,
+      status: "error",
+      error: {
+        code: err.code || "INTERNAL_ERROR",
+        message: err.message,
+        details: err.details || {},
+      },
       message: err.message,
     });
   } else {
@@ -57,6 +67,11 @@ const sendErrorProd = (err, res) => {
 
     res.status(500).json({
       status: "error",
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "เกิดข้อผิดพลาดบางอย่าง!",
+        details: {},
+      },
       message: "เกิดข้อผิดพลาดบางอย่าง!",
     });
   }

@@ -28,6 +28,7 @@ const dashboardRoutes = require("./modules/dashboard/dashboard.routes");
 const userRoutes = require("./modules/users/user.routes");
 const rosterManageRoutes = require("./modules/roster_manage/roster_manage.routes");
 const leaveHubIntegrationRoutes = require("./modules/leaveHubIntegration/leaveHubIntegration.routes");
+const dayResolutionRoutes = require("./modules/day_resolution/day_resolution.routes");
 
 // API Version prefix
 const API_VERSION = "/api";
@@ -54,6 +55,7 @@ router.use(`${API_VERSION}/dashboard`, dashboardRoutes);
 router.use(`${API_VERSION}/users`, userRoutes);
 router.use(`${API_VERSION}/roster-manage`, rosterManageRoutes);
 router.use(`${API_VERSION}/leave-hub-integration`, leaveHubIntegrationRoutes);
+router.use(`${API_VERSION}/day-resolution`, dayResolutionRoutes);
 
 /**
  * API Info route

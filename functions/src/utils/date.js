@@ -73,4 +73,30 @@ function normalizeTime(input) {
   return input;
 }
 
-module.exports = { normalizeDate, formatDateThai, normalizeTime };
+/**
+ * แปลงค่า input ให้เป็น dayjs object ตาม DEFAULT_TZ
+ */
+function toDefaultTz(input) {
+  return dayjs(input).tz(DEFAULT_TZ);
+}
+
+/**
+ * สร้าง dayjs object จาก workDate + timeString ภายใต้ DEFAULT_TZ
+ */
+function buildDateTimeInDefaultTz(workDate, timeString) {
+  if (!workDate || !timeString) return null;
+  return dayjs.tz(
+    `${workDate} ${timeString}`,
+    "YYYY-MM-DD HH:mm:ss",
+    DEFAULT_TZ,
+  );
+}
+
+module.exports = {
+  DEFAULT_TZ,
+  normalizeDate,
+  formatDateThai,
+  normalizeTime,
+  toDefaultTz,
+  buildDateTimeInDefaultTz,
+};
