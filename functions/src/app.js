@@ -9,6 +9,8 @@ const express = require("express");
 const router = express.Router();
 
 // Import routes
+// ===============================================================
+// V1 Routes
 const authRoutes = require("./modules/v1/auth/auth.routes");
 const employeeRoutes = require("./modules/v1/employees/employee.routes");
 const branchRoutes = require("./modules/v1/branches/branch.routes");
@@ -30,32 +32,43 @@ const rosterManageRoutes = require("./modules/v1/roster_manage/roster_manage.rou
 const leaveHubIntegrationRoutes = require("./modules/v1/leaveHubIntegration/leaveHubIntegration.routes");
 const dayResolutionRoutes = require("./modules/v1/day_resolution/day_resolution.routes");
 
+// ===============================================================
+// V2 Routes
+const companyV2Routes = require("./modules/v2/companies/company.routes");
+
 // API Version prefix
-const API_VERSION = "/api";
+const API_VERSION_V1 = "/api";
+const API_VERSION_V2 = "/api/v2";
 
 /**
  * Mount routes
  */
-router.use(`${API_VERSION}/auth`, authRoutes);
-router.use(`${API_VERSION}/employees`, employeeRoutes);
-router.use(`${API_VERSION}/branches`, branchRoutes);
-router.use(`${API_VERSION}/companies`, companyRoutes);
-router.use(`${API_VERSION}/public-holidays`, publicHolidayRoutes);
-router.use(`${API_VERSION}/departments`, departmentRoutes);
-router.use(`${API_VERSION}/devices`, deviceRoutes);
-router.use(`${API_VERSION}/shifts`, shiftRoutes);
-router.use(`${API_VERSION}/shift-patterns`, shiftPatternRoutes);
-router.use(`${API_VERSION}/rosters`, rosterRoutes);
-router.use(`${API_VERSION}/ot-templates`, otTemplateRoutes);
-router.use(`${API_VERSION}/attendance-logs`, attendanceLogRoutes);
-router.use(`${API_VERSION}/requests`, requestRoutes);
-router.use(`${API_VERSION}/audit-trails`, auditTrailRoutes);
-router.use(`${API_VERSION}/company-settings`, companySettingRoutes);
-router.use(`${API_VERSION}/dashboard`, dashboardRoutes);
-router.use(`${API_VERSION}/users`, userRoutes);
-router.use(`${API_VERSION}/roster-manage`, rosterManageRoutes);
-router.use(`${API_VERSION}/leave-hub-integration`, leaveHubIntegrationRoutes);
-router.use(`${API_VERSION}/day-resolution`, dayResolutionRoutes);
+// ===============================================================
+// V1 Routes
+router.use(`${API_VERSION_V1}/auth`, authRoutes);
+router.use(`${API_VERSION_V1}/employees`, employeeRoutes);
+router.use(`${API_VERSION_V1}/branches`, branchRoutes);
+router.use(`${API_VERSION_V1}/companies`, companyRoutes);
+router.use(`${API_VERSION_V1}/public-holidays`, publicHolidayRoutes);
+router.use(`${API_VERSION_V1}/departments`, departmentRoutes);
+router.use(`${API_VERSION_V1}/devices`, deviceRoutes);
+router.use(`${API_VERSION_V1}/shifts`, shiftRoutes);
+router.use(`${API_VERSION_V1}/shift-patterns`, shiftPatternRoutes);
+router.use(`${API_VERSION_V1}/rosters`, rosterRoutes);
+router.use(`${API_VERSION_V1}/ot-templates`, otTemplateRoutes);
+router.use(`${API_VERSION_V1}/attendance-logs`, attendanceLogRoutes);
+router.use(`${API_VERSION_V1}/requests`, requestRoutes);
+router.use(`${API_VERSION_V1}/audit-trails`, auditTrailRoutes);
+router.use(`${API_VERSION_V1}/company-settings`, companySettingRoutes);
+router.use(`${API_VERSION_V1}/dashboard`, dashboardRoutes);
+router.use(`${API_VERSION_V1}/users`, userRoutes);
+router.use(`${API_VERSION_V1}/roster-manage`, rosterManageRoutes);
+router.use(`${API_VERSION_V1}/leave-hub-integration`, leaveHubIntegrationRoutes);
+router.use(`${API_VERSION_V1}/day-resolution`, dayResolutionRoutes);
+
+// ===============================================================
+// V2 Routes
+router.use(`${API_VERSION_V2}/companies`, companyV2Routes);
 
 /**
  * API Info route
