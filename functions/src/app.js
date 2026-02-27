@@ -36,6 +36,8 @@ const dayResolutionRoutes = require("./modules/v1/day_resolution/day_resolution.
 // V2 Routes
 const companyV2Routes = require("./modules/v2/companies/company.routes");
 const departmentV2Routes = require("./modules/v2/departments/department.routes");
+const employeeV2Routes = require("./modules/v2/employees/employee.routes");
+const userV2Routes = require("./modules/v2/users/user.routes");
 
 // API Version prefix
 const API_VERSION_V1 = "/api";
@@ -64,13 +66,18 @@ router.use(`${API_VERSION_V1}/company-settings`, companySettingRoutes);
 router.use(`${API_VERSION_V1}/dashboard`, dashboardRoutes);
 router.use(`${API_VERSION_V1}/users`, userRoutes);
 router.use(`${API_VERSION_V1}/roster-manage`, rosterManageRoutes);
-router.use(`${API_VERSION_V1}/leave-hub-integration`, leaveHubIntegrationRoutes);
+router.use(
+  `${API_VERSION_V1}/leave-hub-integration`,
+  leaveHubIntegrationRoutes,
+);
 router.use(`${API_VERSION_V1}/day-resolution`, dayResolutionRoutes);
 
 // ===============================================================
 // V2 Routes
 router.use(`${API_VERSION_V2}/companies`, companyV2Routes);
 router.use(`${API_VERSION_V2}/departments`, departmentV2Routes);
+router.use(`${API_VERSION_V2}/employees`, employeeV2Routes);
+router.use(`${API_VERSION_V2}/users`, userV2Routes);
 
 /**
  * API Info route
