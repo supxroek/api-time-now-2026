@@ -38,6 +38,7 @@ const companyV2Routes = require("./modules/v2/companies/company.routes");
 const departmentV2Routes = require("./modules/v2/departments/department.routes");
 const employeeV2Routes = require("./modules/v2/employees/employee.routes");
 const userV2Routes = require("./modules/v2/users/user.routes");
+const deviceV2Routes = require("./modules/v2/devices/device.routes");
 
 // API Version prefix
 const API_VERSION_V1 = "/api";
@@ -78,6 +79,7 @@ router.use(`${API_VERSION_V2}/companies`, companyV2Routes);
 router.use(`${API_VERSION_V2}/departments`, departmentV2Routes);
 router.use(`${API_VERSION_V2}/employees`, employeeV2Routes);
 router.use(`${API_VERSION_V2}/users`, userV2Routes);
+router.use(`${API_VERSION_V2}/devices`, deviceV2Routes);
 
 /**
  * API Info route
