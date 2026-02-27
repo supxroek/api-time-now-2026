@@ -6,7 +6,7 @@
 
 **สำคัญมาก:** ก่อนเริ่มเขียนโค้ดหรือ Query ใดๆ ให้ตรวจสอบชื่อตาราง คอลัมน์ และความสัมพันธ์จากไฟล์ SQL นี้เสมอ:
 
-- **ที่อยู่ไฟล์ SQL:** `api-time-now-2026\functions\docs\time-now-new.sql`
+- **ที่อยู่ไฟล์ SQL:** `C:\Working\api-time-now-2026\functions\docs\time-now-new.sql`
 
 ## 2. ลำดับความสำคัญและกลยุทธ์การ Refactor
 

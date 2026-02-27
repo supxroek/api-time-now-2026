@@ -11,7 +11,7 @@
 --    - attendance_logs: ลบ status ออก (ไม่ใช่ข้อมูล log level)
 --      เพิ่ม is_manual และ source_request_id แทน
 --    - rosters: ลบ flag ซ้ำซ้อน (is_public_holiday, is_holiday_swap,
---      is_compensatory) ออก เนื่องจาก base_day_type ครอบคลุมแล้ว
+--      is_compensatory) ออก เนื่องจาก day_type ครอบคลุมแล้ว
 --      เพิ่ม attendance_status แทน (computed summary ของวัน)
 --    - roster_ot_slots: ลบ status ออก ใช้ requests.status แทน
 --      เพิ่ม request_id เชื่อมกับ requests
@@ -19,7 +19,7 @@
 --  Changelog v2.2:
 --    - rosters: ลบ attendance_status ออก (ย้ายไป attendance_daily_summaries)
 --    - rosters: ลบ leave_status / leave_hours_data ออก
---      เนื่องจาก base_day_type ครอบคลุม leave type แล้ว
+--      เนื่องจาก day_type ครอบคลุม leave type แล้ว
 --      รายละเอียดชั่วโมงลาเก็บใน attendance_daily_summaries.leave_hours_data แทน
 --    - เพิ่ม attendance_daily_summaries (computed summary ระดับวัน)
 --    - requests: เพิ่ม ON DELETE RESTRICT บน roster_id FK
@@ -339,7 +339,7 @@ CREATE TABLE ot_templates
 -- บอกว่าวันนั้น "ควรจะเป็น" อะไร (กะงาน, ประเภทวัน, แหล่งข้อมูล)
 -- ไม่บอกว่า "เกิดอะไรขึ้น" จริงๆ — ส่วนนั้นอยู่ใน attendance_daily_summaries
 --
--- base_day_type:
+-- day_type:
 --   workday           = วันทำงานปกติ
 --   weekly_off        = วันหยุดประจำสัปดาห์
 --   public_holiday    = วันหยุดนักขัตฤกษ์  (มาจาก Leavehub เมื่อ connected)
@@ -347,8 +347,9 @@ CREATE TABLE ot_templates
 --   holiday_swap      = วันหยุดสลับ           (มาจาก Leavehub)
 --   annual_leave      = ลาพักร้อน             (มาจาก Leavehub)
 --   sick_leave        = ลาป่วย                (มาจาก Leavehub)
---   personal_leave    = ลากิจ                 (มาจาก Leavehub)
---   other_leave       = ลาอื่นๆ               (มาจาก Leavehub)
+--   private_leave     = ลากิจ                 (มาจาก Leavehub)
+--   unpaid_leave      = ลาไม่รับเงินเดือน         (มาจาก Leavehub)
+--   other_leave       = ลาอื่นๆ (ประเภทที่ Leavehub ไม่ระบุ) (มาจาก Leavehub)
 CREATE TABLE rosters
 (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -361,13 +362,17 @@ CREATE TABLE rosters
     shift_id      INT  NULL,
 
     -- ประเภทวันหลัก — single source of truth สำหรับประเภทวัน
-    base_day_type ENUM (
+    day_type ENUM (
         'workday',
         'weekly_off',
         'public_holiday',
-        'leave',
         'compensated_holiday',
         'holiday_swap',
+        'annual_leave',
+        'sick_leave',
+        'private_leave',
+        'unpaid_leave',
+        'other_leave'
     ) NOT NULL DEFAULT 'workday',
 
     -- แหล่งข้อมูลที่ใช้ resolve roster นี้
@@ -459,9 +464,10 @@ CREATE TABLE attendance_logs
 --   normal      = เข้า-ออกตรงเวลา ไม่สาย ไม่ออกก่อน
 --   late        = เข้างานสายเกิน tolerance ที่กำหนด
 --   early_exit  = ออกก่อนเวลาเกิน tolerance ที่กำหนด
+--   late_and_early_exit = สายและออกก่อนเกิน tolerance ที่กำหนด
 --   absent      = ไม่มี log เลย (ไม่ได้ลา, ไม่ใช่วันหยุด)
---   leave       = ลา (base_day_type เป็น *_leave)
---   holiday     = วันหยุด (base_day_type เป็น weekly_off / public_holiday / ...)
+--   leave       = ลา (day_type เป็น *_leave)
+--   holiday     = วันหยุด (day_type เป็น weekly_off / public_holiday / ...)
 CREATE TABLE attendance_daily_summaries
 (
     id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -471,8 +477,8 @@ CREATE TABLE attendance_daily_summaries
     work_date           DATE   NOT NULL,
 
     -- เวลาจริงที่บันทึกได้
-    first_check_in      DATETIME NULL,
-    last_check_out      DATETIME NULL,
+    first_check_in      DATETIME NULL,  -- เวลาที่ check_in ครั้งแรกของวัน (รวม OT)
+    last_check_out      DATETIME NULL,  -- เวลาที่ check_out ครั้งสุดท้ายของวัน (รวม OT)
 
     -- สรุปเวลา (หน่วย: นาที)
     total_work_minutes  INT DEFAULT 0 NOT NULL,  -- เวลาทำงานสุทธิ (หักพัก)
@@ -480,10 +486,6 @@ CREATE TABLE attendance_daily_summaries
     late_minutes        INT DEFAULT 0 NOT NULL,  -- สายกี่นาที (0 ถ้าไม่สาย)
     early_exit_minutes  INT DEFAULT 0 NOT NULL,  -- ออกก่อนกี่นาที (0 ถ้าไม่ออกก่อน)
     total_ot_minutes    INT DEFAULT 0 NOT NULL,  -- OT รวมทุกช่วง
-
-    -- รายละเอียดชั่วโมงลา (เฉพาะกรณีลาไม่เต็มวัน, sync มาจาก Leavehub)
-    -- เช่น [{"start":"09:00","end":"12:00","leave_type":"sick_leave"}]
-    leave_hours_data    JSON NULL,
 
     attendance_status   ENUM (
         'pending',
@@ -518,29 +520,26 @@ CREATE TABLE attendance_daily_summaries
 --
 -- type = correction:
 -- {
---   "correction_date": "2026-02-20",
---   "original_in":     "2026-02-20T08:45:00",
---   "original_out":    "2026-02-20T17:30:00",
---   "requested_in":    "2026-02-20T08:00:00",
---   "requested_out":   "2026-02-20T17:30:00",
---   "reason":          "ลืม check in"
+--   "date":        "2026-02-12",
+--   "log_type":        "check_in",
+--   "time": "08:30:00",
+--   "reason":          "เครื่องสแกนหน้าบริษัทไม่ติดช่วงเช้า"
 -- }
 --
 -- type = ot:
 -- {
---   "ot_date":         "2026-02-20",
---   "ot_start":        "18:00",
---   "ot_end":          "21:00",
---   "reason":          "งานด่วน"
+--   "date":            "2026-02-12",
+--   "ot_template_id":  1,
+--   "reason":          "อยู่ช่วยงานติดตั้งเซิร์ฟเวอร์ใหม่ของลูกค้าให้เสร็จตามกำหนด"
 -- }
 --
 -- type = shift_swap:
 -- {
---   "swap_date":              "2026-02-20",
+--   "date":              "2026-02-20",
 --   "from_shift_id":          1,
 --   "to_shift_id":            3,
 --   "swap_with_employee_id":  null,
---   "reason":                 "นัดหมายส่วนตัว"
+--   "reason":                 "มีความจำเป็นต้องพาบิดาไปพบแพทย์ตามนัดในเวลาเช้า"
 -- }
 CREATE TABLE requests
 (
@@ -558,7 +557,7 @@ CREATE TABLE requests
 
     request_data   JSON         NULL,
     rejected_reason TEXT         NULL,
-    evidence_image  VARCHAR(500) NULL,  -- URL รูปหลักฐาน
+    evidence_image  LONGTEXT NULL,  -- URL รูปหลักฐาน/base64 encoded image
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     approved_at     TIMESTAMP NULL,
 
