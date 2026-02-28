@@ -8,57 +8,17 @@ router.use(protect);
 
 router
   .route("/")
-  .get(
-    restrictTo("super_admin", "admin", "manager"),
-    shiftController.getAllShifts,
-  )
-  .post(restrictTo("super_admin", "admin"), shiftController.createShift);
+  .get(restrictTo("super_admin", "admin", "manager"), shiftController.getAll)
+  .post(restrictTo("super_admin", "admin"), shiftController.create);
 
 router
   .route("/:id")
-  .get(
-    restrictTo("super_admin", "admin", "manager"),
-    shiftController.getShiftById,
-  )
-  .patch(restrictTo("super_admin", "admin"), shiftController.updateShift)
-  .delete(restrictTo("super_admin", "admin"), shiftController.deleteShift);
+  .get(restrictTo("super_admin", "admin", "manager"), shiftController.getOne)
+  .patch(restrictTo("super_admin", "admin"), shiftController.update)
+  .delete(restrictTo("super_admin", "admin"), shiftController.delete);
 
 router
   .route("/:id/restore")
-  .patch(restrictTo("super_admin", "admin"), shiftController.restoreShift);
-
-router
-  .route("/assignments")
-  .get(
-    restrictTo("super_admin", "admin", "manager"),
-    shiftController.getAssignments,
-  )
-  .post(restrictTo("super_admin", "admin"), shiftController.createAssignment);
-
-router
-  .route("/assignments/:id")
-  .get(
-    restrictTo("super_admin", "admin", "manager"),
-    shiftController.getAssignmentById,
-  )
-  .patch(restrictTo("super_admin", "admin"), shiftController.updateAssignment)
-  .delete(restrictTo("super_admin", "admin"), shiftController.deleteAssignment);
-
-router
-  .route("/custom-days")
-  .get(
-    restrictTo("super_admin", "admin", "manager"),
-    shiftController.getCustomDays,
-  )
-  .post(restrictTo("super_admin", "admin"), shiftController.createCustomDay);
-
-router
-  .route("/custom-days/:id")
-  .get(
-    restrictTo("super_admin", "admin", "manager"),
-    shiftController.getCustomDayById,
-  )
-  .patch(restrictTo("super_admin", "admin"), shiftController.updateCustomDay)
-  .delete(restrictTo("super_admin", "admin"), shiftController.deleteCustomDay);
+  .patch(restrictTo("super_admin", "admin"), shiftController.restore);
 
 module.exports = router;
