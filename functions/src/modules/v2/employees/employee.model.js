@@ -173,6 +173,131 @@ class EmployeeModel {
     `;
     await db.query(query, [id, companyId]);
   }
+
+  async existsShiftInCompany(shiftId, companyId, executor = db) {
+    const query = `
+      SELECT id
+      FROM shifts
+      WHERE id = ? AND company_id = ? AND deleted_at IS NULL
+      LIMIT 1
+    `;
+    const [rows] = await executor.query(query, [shiftId, companyId]);
+    return rows.length > 0;
+  }
+
+  async findCurrentShiftAssignment(employeeId, companyId, executor = db) {
+    const query = `
+      SELECT id, company_id, employee_id, shift_mode, shift_id, effective_from, effective_to, created_by, created_at
+      FROM employee_shift_assignments
+      WHERE employee_id = ?
+        AND company_id = ?
+        AND effective_to IS NULL
+      ORDER BY effective_from DESC, id DESC
+      LIMIT 1
+    `;
+
+    const [rows] = await executor.query(query, [employeeId, companyId]);
+    return rows[0] || null;
+  }
+
+  async closeCurrentShiftAssignment(assignmentId, effectiveTo, executor = db) {
+    const query = `
+      UPDATE employee_shift_assignments
+      SET effective_to = ?
+      WHERE id = ?
+    `;
+
+    await executor.query(query, [effectiveTo, assignmentId]);
+  }
+
+  async createShiftAssignment(data, executor = db) {
+    const query = `
+      INSERT INTO employee_shift_assignments
+      (company_id, employee_id, shift_mode, shift_id, effective_from, effective_to, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const [result] = await executor.query(query, [
+      data.company_id,
+      data.employee_id,
+      data.shift_mode,
+      data.shift_id,
+      data.effective_from,
+      data.effective_to,
+      data.created_by,
+    ]);
+
+    return result.insertId;
+  }
+
+  async findShiftAssignmentById(id, companyId, executor = db) {
+    const query = `
+      SELECT id, company_id, employee_id, shift_mode, shift_id, effective_from, effective_to, created_by, created_at
+      FROM employee_shift_assignments
+      WHERE id = ? AND company_id = ?
+      LIMIT 1
+    `;
+
+    const [rows] = await executor.query(query, [id, companyId]);
+    return rows[0] || null;
+  }
+
+  async findCurrentDayoffAssignment(employeeId, companyId, executor = db) {
+    const query = `
+      SELECT id, company_id, employee_id, dayoff_mode, weekly_days, effective_from, effective_to, created_by, created_at
+      FROM employee_dayoff_assignments
+      WHERE employee_id = ?
+        AND company_id = ?
+        AND effective_to IS NULL
+      ORDER BY effective_from DESC, id DESC
+      LIMIT 1
+    `;
+
+    const [rows] = await executor.query(query, [employeeId, companyId]);
+    return rows[0] || null;
+  }
+
+  async closeCurrentDayoffAssignment(assignmentId, effectiveTo, executor = db) {
+    const query = `
+      UPDATE employee_dayoff_assignments
+      SET effective_to = ?
+      WHERE id = ?
+    `;
+
+    await executor.query(query, [effectiveTo, assignmentId]);
+  }
+
+  async createDayoffAssignment(data, executor = db) {
+    const query = `
+      INSERT INTO employee_dayoff_assignments
+      (company_id, employee_id, dayoff_mode, weekly_days, effective_from, effective_to, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const [result] = await executor.query(query, [
+      data.company_id,
+      data.employee_id,
+      data.dayoff_mode,
+      data.weekly_days,
+      data.effective_from,
+      data.effective_to,
+      data.created_by,
+    ]);
+
+    return result.insertId;
+  }
+
+  async findDayoffAssignmentById(id, companyId, executor = db) {
+    const query = `
+      SELECT id, company_id, employee_id, dayoff_mode, weekly_days, effective_from, effective_to, created_by, created_at
+      FROM employee_dayoff_assignments
+      WHERE id = ? AND company_id = ?
+      LIMIT 1
+    `;
+
+    const [rows] = await executor.query(query, [id, companyId]);
+    return rows[0] || null;
+  }
 }
 
 module.exports = new EmployeeModel();

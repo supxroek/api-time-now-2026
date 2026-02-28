@@ -21,4 +21,20 @@ router
   .patch(restrictTo("super_admin", "admin"), employeeController.update)
   .delete(restrictTo("super_admin", "admin"), employeeController.delete);
 
+router
+  // Endpoint: PATCH /api/v2/employees/:id/shift-assignment/switch-mode
+  .route("/:id/shift-assignment/switch-mode")
+  .patch(
+    restrictTo("super_admin", "admin"),
+    employeeController.switchShiftMode,
+  );
+
+router
+  // Endpoint: PATCH /api/v2/employees/:id/dayoff-assignment/switch-mode
+  .route("/:id/dayoff-assignment/switch-mode")
+  .patch(
+    restrictTo("super_admin", "admin"),
+    employeeController.switchDayoffMode,
+  );
+
 module.exports = router;

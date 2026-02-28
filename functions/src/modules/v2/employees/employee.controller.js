@@ -48,6 +48,34 @@ class EmployeeController {
       data: null,
     });
   });
+
+  switchShiftMode = catchAsync(async (req, res, _next) => {
+    const result = await EmployeeService.switchShiftMode(
+      req.user,
+      req.params.id,
+      req.body,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
+  switchDayoffMode = catchAsync(async (req, res, _next) => {
+    const result = await EmployeeService.switchDayoffMode(
+      req.user,
+      req.params.id,
+      req.body,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
 }
 
 module.exports = new EmployeeController();
