@@ -14,6 +14,16 @@ class ShiftService {
     "is_night_shift",
   ]);
 
+  // map ชื่อฟิลด์
+  static FIELD_MAP = {
+    name: "ชื่อกะงาน",
+    type: "ประเภท",
+    start_time: "เวลาเริ่มต้น",
+    end_time: "เวลาสิ้นสุด",
+    break_start_time: "เวลาเริ่มต้นช่วงพัก",
+    break_end_time: "เวลาสิ้นสุดช่วงพัก",
+  };
+
   filterAllowedFields(payload) {
     const filtered = {};
     Object.keys(payload || {}).forEach((key) => {
@@ -47,13 +57,19 @@ class ShiftService {
     return normalized;
   }
 
-  validateData(data, { requireName = false } = {}) {
-    if (requireName && !data.name) {
-      throw new AppError("กรุณาระบุชื่อกะการทำงาน", 400);
-    }
-
-    if (data.name !== undefined && !data.name) {
-      throw new AppError("กรุณาระบุชื่อกะการทำงาน", 400);
+  validateData(
+    data,
+    { requiredFields = ["name", "start_time", "end_time"] } = {},
+  ) {
+    if (requiredFields) {
+      requiredFields.forEach((field) => {
+        if (data[field] === undefined || data[field] === null) {
+          throw new AppError(
+            `กรุณาระบุ ${ShiftService.FIELD_MAP[field] || field}`,
+            400,
+          );
+        }
+      });
     }
 
     if (data.type !== undefined && !["fixed", "flexible"].includes(data.type)) {
@@ -62,6 +78,13 @@ class ShiftService {
 
     if (data.is_break !== undefined && ![0, 1].includes(data.is_break)) {
       throw new AppError("is_break ต้องเป็น 0 หรือ 1", 400);
+    }
+
+    if (
+      data.is_break === 1 &&
+      (data.break_start_time === undefined || data.break_end_time === undefined)
+    ) {
+      throw new AppError("กรุณาระบุเวลาเริ่มต้นและสิ้นสุดพัก", 400);
     }
 
     if (
@@ -102,7 +125,9 @@ class ShiftService {
     const companyId = user.company_id;
     const cleanData = this.normalizeData(this.filterAllowedFields(payload));
 
-    this.validateData(cleanData, { requireName: true });
+    this.validateData(cleanData, {
+      requiredFields: ["name", "start_time", "end_time"],
+    });
 
     const duplicate = await ShiftModel.findByNameAndCompanyId(
       cleanData.name,
@@ -188,18 +213,20 @@ class ShiftService {
   async updateShift(user, shiftId, payload, ipAddress) {
     const companyId = user.company_id;
     const oldShift = await ShiftModel.findByIdAndCompanyId(shiftId, companyId);
+    console.log("Old Shift:", oldShift);
     if (!oldShift) {
       throw new AppError("ไม่พบข้อมูลกะการทำงานที่ต้องการแก้ไข", 404);
     }
 
     const cleanData = this.normalizeData(this.filterAllowedFields(payload));
-    this.validateData(cleanData, { requireName: false });
+    console.log("Clean Data:", cleanData);
+    this.validateData(cleanData, { requiredFields: ["name"] });
 
-    if (cleanData.name && cleanData.name !== oldShift.name) {
+    // ตรวจสอบชื่อซ้ำเมื่อมีการเปลี่ยนชื่อ
+    if (cleanData.name && cleanData.name == oldShift.name) {
       const duplicate = await ShiftModel.findByNameAndCompanyId(
         cleanData.name,
         companyId,
-        Number(shiftId),
       );
       if (duplicate) {
         throw new AppError(
