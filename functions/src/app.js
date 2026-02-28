@@ -42,6 +42,7 @@ const deviceV2Routes = require("./modules/v2/devices/device.routes");
 const otTemplateV2Routes = require("./modules/v2/ot_templates/ot_template.routes");
 const shiftV2Routes = require("./modules/v2/shifts/shift.routes");
 const requestV2Routes = require("./modules/v2/requests/request.routes");
+const auditTrailV2Routes = require("./modules/v2/audit_trails/audit_trail.routes");
 
 // API Version prefix
 const API_VERSION_V1 = "/api";
@@ -86,6 +87,7 @@ router.use(`${API_VERSION_V2}/devices`, deviceV2Routes);
 router.use(`${API_VERSION_V2}/ot-templates`, otTemplateV2Routes);
 router.use(`${API_VERSION_V2}/shifts`, shiftV2Routes);
 router.use(`${API_VERSION_V2}/requests`, requestV2Routes);
+router.use(`${API_VERSION_V2}/audit-trails`, auditTrailV2Routes);
 
 /**
  * API Info route
