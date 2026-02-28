@@ -31,7 +31,8 @@ class RequestService {
       try {
         return JSON.parse(requestData);
       } catch (error) {
-        return requestData;
+        console.error("Failed to parse request_data:", error);
+        return null;
       }
     }
 
