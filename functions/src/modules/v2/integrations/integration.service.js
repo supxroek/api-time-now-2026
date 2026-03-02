@@ -16,6 +16,8 @@ const {
 } = process.env;
 
 class IntegrationService {
+  static BULK_ROSTER_UPSERT_EMPLOYEE_THRESHOLD = 500;
+
   static THAI_MONTH_MAP = {
     มกราคม: 1,
     กุมภาพันธ์: 2,
@@ -700,6 +702,84 @@ class IntegrationService {
     return map;
   }
 
+  appendHolidayEventsToMap(holidays, eventsMap, allEmployeeIds, debug) {
+    (Array.isArray(holidays) ? holidays : []).forEach((holiday) => {
+      const holidayDates = this.resolveHolidayWorkDates(holiday);
+      if (!holidayDates.length) {
+        debug.holidays.skipped += 1;
+        this.pushDebugSample(debug.holidays.details, {
+          holiday_id: holiday?.id || null,
+          name: holiday?.name || holiday?.holiday_name || null,
+          input_date: holiday?.date || holiday?.holiday_date || null,
+          lunar_date:
+            holiday?.lunar_date ||
+            holiday?.lunarDate ||
+            holiday?.holiday_lunar_date ||
+            null,
+          status: "skipped",
+          reason: "unresolved_holiday_date",
+        });
+        return;
+      }
+
+      debug.holidays.resolved += 1;
+      this.pushDebugSample(debug.holidays.details, {
+        holiday_id: holiday?.id || null,
+        name: holiday?.name || holiday?.holiday_name || null,
+        input_date: holiday?.date || holiday?.holiday_date || null,
+        lunar_date:
+          holiday?.lunar_date ||
+          holiday?.lunarDate ||
+          holiday?.holiday_lunar_date ||
+          null,
+        status: "resolved",
+        resolved_dates: holidayDates,
+      });
+
+      const dayType = this.mapHolidayToDayType(holiday);
+
+      holidayDates.forEach((holidayDate) => {
+        allEmployeeIds.forEach((employeeId) => {
+          this.setEventWithPriority(eventsMap, {
+            employee_id: employeeId,
+            work_date: holidayDate,
+            day_type: dayType,
+            leave_hours_data: null,
+            priority: 2,
+          });
+        });
+      });
+    });
+  }
+
+  async upsertReconciledRosterEvents(
+    shouldUseBulkUpsert,
+    bulkUpsertPayloads,
+    executor,
+    debug,
+  ) {
+    if (shouldUseBulkUpsert) {
+      const bulkResult = await IntegrationModel.upsertLeaveHubRostersBulk(
+        bulkUpsertPayloads,
+        executor,
+      );
+
+      debug.reconciled.batch_fallback_used = Boolean(bulkResult?.usedFallback);
+      debug.reconciled.batches_executed = Number(
+        bulkResult?.batchesExecuted || 0,
+      );
+      return;
+    }
+
+    for (const payload of bulkUpsertPayloads) {
+      await IntegrationModel.upsertLeaveHubRoster(payload, executor);
+    }
+
+    debug.reconciled.batches_executed = bulkUpsertPayloads.length
+      ? bulkUpsertPayloads.length
+      : 0;
+  }
+
   async reconcileSyncPayloadToRosters(companyId, syncPayload, executor) {
     const employees = await IntegrationModel.findEmployeesForLeaveHubMapping(
       companyId,
@@ -743,6 +823,9 @@ class IntegrationService {
         total_events: 0,
         by_day_type: {},
         samples: [],
+        upsert_mode: "single",
+        batch_fallback_used: false,
+        batches_executed: 0,
       },
       failed: {
         reasons: [],
@@ -918,63 +1001,26 @@ class IntegrationService {
       });
     });
 
-    (Array.isArray(syncPayload.holidays) ? syncPayload.holidays : []).forEach(
-      (holiday) => {
-        const holidayDates = this.resolveHolidayWorkDates(holiday);
-        if (!holidayDates.length) {
-          debug.holidays.skipped += 1;
-          this.pushDebugSample(debug.holidays.details, {
-            holiday_id: holiday?.id || null,
-            name: holiday?.name || holiday?.holiday_name || null,
-            input_date: holiday?.date || holiday?.holiday_date || null,
-            lunar_date:
-              holiday?.lunar_date ||
-              holiday?.lunarDate ||
-              holiday?.holiday_lunar_date ||
-              null,
-            status: "skipped",
-            reason: "unresolved_holiday_date",
-          });
-          return;
-        }
-
-        debug.holidays.resolved += 1;
-        this.pushDebugSample(debug.holidays.details, {
-          holiday_id: holiday?.id || null,
-          name: holiday?.name || holiday?.holiday_name || null,
-          input_date: holiday?.date || holiday?.holiday_date || null,
-          lunar_date:
-            holiday?.lunar_date ||
-            holiday?.lunarDate ||
-            holiday?.holiday_lunar_date ||
-            null,
-          status: "resolved",
-          resolved_dates: holidayDates,
-        });
-
-        const dayType = this.mapHolidayToDayType(holiday);
-
-        holidayDates.forEach((holidayDate) => {
-          allEmployeeIds.forEach((employeeId) => {
-            this.setEventWithPriority(eventsMap, {
-              employee_id: employeeId,
-              work_date: holidayDate,
-              day_type: dayType,
-              leave_hours_data: null,
-              priority: 2,
-            });
-          });
-        });
-      },
+    this.appendHolidayEventsToMap(
+      syncPayload.holidays,
+      eventsMap,
+      allEmployeeIds,
+      debug,
     );
 
     const events = Array.from(eventsMap.values());
     debug.reconciled.total_events = events.length;
 
+    const shouldUseBulkUpsert =
+      allEmployeeIds.length >
+      IntegrationService.BULK_ROSTER_UPSERT_EMPLOYEE_THRESHOLD;
+    debug.reconciled.upsert_mode = shouldUseBulkUpsert ? "bulk" : "single";
+
     const affectedEmployeeIds = new Set();
     const fallbackDate = new Date().toISOString().slice(0, 10);
     let minDate = events[0]?.work_date || fallbackDate;
     let maxDate = events[0]?.work_date || fallbackDate;
+    const bulkUpsertPayloads = [];
 
     for (const event of events) {
       affectedEmployeeIds.add(event.employee_id);
@@ -990,23 +1036,27 @@ class IntegrationService {
         maxDate = event.work_date;
       }
 
-      await IntegrationModel.upsertLeaveHubRoster(
-        {
-          company_id: companyId,
+      bulkUpsertPayloads.push({
+        company_id: companyId,
+        employee_id: event.employee_id,
+        work_date: event.work_date,
+        day_type: event.day_type,
+        leave_hours_data: event.leave_hours_data,
+        source_payload_hash: DayResolutionService.buildSnapshotHash({
           employee_id: event.employee_id,
           work_date: event.work_date,
           day_type: event.day_type,
-          leave_hours_data: event.leave_hours_data,
-          source_payload_hash: DayResolutionService.buildSnapshotHash({
-            employee_id: event.employee_id,
-            work_date: event.work_date,
-            day_type: event.day_type,
-            source_system: "leavehub",
-          }),
-        },
-        executor,
-      );
+          source_system: "leavehub",
+        }),
+      });
     }
+
+    await this.upsertReconciledRosterEvents(
+      shouldUseBulkUpsert,
+      bulkUpsertPayloads,
+      executor,
+      debug,
+    );
 
     const affectedSummaries =
       await IntegrationModel.recalculateAttendanceSummariesByEmployeeDateRange(

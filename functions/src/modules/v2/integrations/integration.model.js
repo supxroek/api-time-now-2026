@@ -1,6 +1,108 @@
 const db = require("../../../config/db.config");
 
 class IntegrationModel {
+  isPacketTooLargeError(error) {
+    const message = String(error?.message || "").toLowerCase();
+
+    return (
+      error?.code === "ER_NET_PACKET_TOO_LARGE" ||
+      error?.errno === 1153 ||
+      message.includes("max_allowed_packet") ||
+      message.includes("packet too large")
+    );
+  }
+
+  buildBulkRosterInsertQuery(payloads) {
+    const valuesSql = payloads
+      .map(() => "(?, ?, ?, NULL, ?, 'leavehub', ?, 0, ?, 1, NOW())")
+      .join(", ");
+
+    const query = `
+      INSERT INTO rosters (
+        company_id,
+        employee_id,
+        work_date,
+        shift_id,
+        day_type,
+        source_system,
+        leave_hours_data,
+        is_ot_allowed,
+        source_payload_hash,
+        sync_version,
+        resolved_at
+      )
+      VALUES ${valuesSql}
+      ON DUPLICATE KEY UPDATE
+        day_type = VALUES(day_type),
+        source_system = VALUES(source_system),
+        leave_hours_data = VALUES(leave_hours_data),
+        source_payload_hash = VALUES(source_payload_hash),
+        sync_version = sync_version + 1,
+        resolved_at = NOW()
+    `;
+
+    const params = [];
+    payloads.forEach((payload) => {
+      params.push(
+        payload.company_id,
+        payload.employee_id,
+        payload.work_date,
+        payload.day_type,
+        payload.leave_hours_data
+          ? JSON.stringify(payload.leave_hours_data)
+          : null,
+        payload.source_payload_hash || null,
+      );
+    });
+
+    return { query, params };
+  }
+
+  async executeBulkRosterUpsertWithFallback(payloads, executor = db) {
+    if (!Array.isArray(payloads) || !payloads.length) {
+      return {
+        affectedRows: 0,
+        usedFallback: false,
+        batchesExecuted: 0,
+      };
+    }
+
+    const { query, params } = this.buildBulkRosterInsertQuery(payloads);
+
+    try {
+      const [result] = await executor.query(query, params);
+      return {
+        affectedRows: result.affectedRows || 0,
+        usedFallback: false,
+        batchesExecuted: 1,
+      };
+    } catch (error) {
+      if (!this.isPacketTooLargeError(error) || payloads.length === 1) {
+        throw error;
+      }
+
+      const middleIndex = Math.ceil(payloads.length / 2);
+      const leftPayloads = payloads.slice(0, middleIndex);
+      const rightPayloads = payloads.slice(middleIndex);
+
+      const leftResult = await this.executeBulkRosterUpsertWithFallback(
+        leftPayloads,
+        executor,
+      );
+      const rightResult = await this.executeBulkRosterUpsertWithFallback(
+        rightPayloads,
+        executor,
+      );
+
+      return {
+        affectedRows: leftResult.affectedRows + rightResult.affectedRows,
+        usedFallback: true,
+        batchesExecuted:
+          leftResult.batchesExecuted + rightResult.batchesExecuted,
+      };
+    }
+  }
+
   async findLeaveHubIntegration(companyId, executor = db) {
     const query = `
       SELECT
@@ -177,6 +279,15 @@ class IntegrationModel {
         : null,
       payload.source_payload_hash || null,
     ]);
+  }
+
+  async upsertLeaveHubRostersBulk(payloads, executor = db) {
+    const result = await this.executeBulkRosterUpsertWithFallback(
+      payloads,
+      executor,
+    );
+
+    return result;
   }
 
   async recalculateFutureLeaveHubRostersToLocal(
