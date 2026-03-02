@@ -17,6 +17,7 @@ const {
 
 class IntegrationService {
   static BULK_ROSTER_UPSERT_EMPLOYEE_THRESHOLD = 500;
+  static COMPENSATION_SEARCH_LIMIT_DAYS = 30;
 
   static THAI_MONTH_MAP = {
     มกราคม: 1,
@@ -676,6 +677,171 @@ class IntegrationService {
     }
   }
 
+  getWeekdayKey(workDate) {
+    const weekdayKeys = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    const [year, month, day] = String(workDate).split("-").map(Number);
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    return weekdayKeys[weekday];
+  }
+
+  addDays(workDate, daysToAdd) {
+    const date = new Date(`${workDate}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + Number(daysToAdd));
+    return date.toISOString().slice(0, 10);
+  }
+
+  parseLeavehubDayOffRule(dayOffRaw) {
+    if (!dayOffRaw) {
+      return { weekdays: [], customDates: [] };
+    }
+
+    let parsed = dayOffRaw;
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        parsed = String(dayOffRaw)
+          .split(/[,|;]/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+    }
+
+    const source = Array.isArray(parsed) ? parsed : [parsed];
+    const weekdays = [];
+    const customDates = [];
+
+    source.forEach((item) => {
+      const token = String(item || "").trim();
+      if (!token) return;
+
+      const dateValue = this.toDateString(token);
+      if (dateValue) {
+        customDates.push(dateValue);
+        return;
+      }
+
+      const upper = token.toUpperCase();
+      const short = upper.slice(0, 3);
+      if (["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].includes(short)) {
+        weekdays.push(short);
+      }
+    });
+
+    return { weekdays, customDates };
+  }
+
+  buildEmployeeLeaveHubDayoffRules(
+    staffs,
+    customDayoffs,
+    employeeByPassport,
+    staffPassportById,
+  ) {
+    const rulesMap = new Map();
+
+    (Array.isArray(staffs) ? staffs : []).forEach((staff) => {
+      const passport = this.normalizePassportValue(
+        staff?.ID_or_Passport_Number ||
+          staff?.id_or_passport_number ||
+          staff?.idOrPassportNumber,
+      );
+      if (!passport || !employeeByPassport.has(passport)) {
+        return;
+      }
+
+      const employeeId = employeeByPassport.get(passport);
+      const dayOffStatus = Number(
+        staff?.dayOff_Status ?? staff?.dayoff_status ?? 0,
+      );
+      const parsedRule = this.parseLeavehubDayOffRule(
+        staff?.dayOff ?? staff?.dayoff,
+      );
+
+      rulesMap.set(employeeId, {
+        dayOffStatus: Number.isFinite(dayOffStatus) ? dayOffStatus : 0,
+        weekdays: new Set(parsedRule.weekdays),
+        customDates: new Set(parsedRule.customDates),
+      });
+    });
+
+    (Array.isArray(customDayoffs) ? customDayoffs : []).forEach((item) => {
+      const passport = this.getLeaveHubPassportFromRecord(
+        item,
+        staffPassportById,
+      );
+      if (!passport || !employeeByPassport.has(passport)) {
+        return;
+      }
+
+      const employeeId = employeeByPassport.get(passport);
+      const existing = rulesMap.get(employeeId) || {
+        dayOffStatus: 1,
+        weekdays: new Set(),
+        customDates: new Set(),
+      };
+
+      const dayOffStatus = Number(item?.dayOff_Status ?? item?.dayoff_status);
+      if (Number.isFinite(dayOffStatus)) {
+        existing.dayOffStatus = dayOffStatus;
+      }
+
+      const customDates = Array.isArray(item?.off_dates)
+        ? item.off_dates
+        : [item?.off_date, item?.date, item?.work_date];
+
+      customDates.forEach((dateValue) => {
+        const normalized = this.toDateString(dateValue);
+        if (normalized) {
+          existing.customDates.add(normalized);
+        }
+      });
+
+      rulesMap.set(employeeId, existing);
+    });
+
+    return rulesMap;
+  }
+
+  isEmployeeWeeklyOffOnDate(employeeRules, workDate) {
+    if (!employeeRules) return false;
+
+    if (employeeRules.dayOffStatus === 1) {
+      return employeeRules.customDates.has(workDate);
+    }
+
+    return employeeRules.weekdays.has(this.getWeekdayKey(workDate));
+  }
+
+  findNextAvailableWorkday(startDate, employeeRules, holidayList) {
+    for (
+      let index = 0;
+      index < IntegrationService.COMPENSATION_SEARCH_LIMIT_DAYS;
+      index += 1
+    ) {
+      const candidateDate = this.addDays(startDate, index);
+      if (holidayList.has(candidateDate)) {
+        continue;
+      }
+
+      if (this.isEmployeeWeeklyOffOnDate(employeeRules, candidateDate)) {
+        continue;
+      }
+
+      return candidateDate;
+    }
+
+    return null;
+  }
+
+  buildLeavehubEventHash(event) {
+    return DayResolutionService.buildSnapshotHash({
+      employee_id: event.employee_id,
+      work_date: event.work_date,
+      day_type: event.day_type,
+      source_system: "leavehub",
+    });
+  }
+
   buildStaffPassportMap(staffs) {
     const map = new Map();
 
@@ -752,6 +918,80 @@ class IntegrationService {
     });
   }
 
+  appendCompensatoryHolidayEventsToMap(
+    holidays,
+    eventsMap,
+    allEmployeeIds,
+    employeeRulesMap,
+    debug,
+  ) {
+    const resolvedHolidayDates = new Set();
+
+    (Array.isArray(holidays) ? holidays : []).forEach((holiday) => {
+      const dates = this.resolveHolidayWorkDates(holiday);
+      dates.forEach((dateValue) => resolvedHolidayDates.add(dateValue));
+    });
+
+    const blockedHolidayDates = new Set(resolvedHolidayDates);
+
+    (Array.isArray(holidays) ? holidays : []).forEach((holiday) => {
+      const holidayDates = this.resolveHolidayWorkDates(holiday);
+      if (!holidayDates.length) {
+        return;
+      }
+
+      holidayDates.forEach((holidayDate) => {
+        allEmployeeIds.forEach((employeeId) => {
+          const employeeRules = employeeRulesMap.get(employeeId);
+          if (!this.isEmployeeWeeklyOffOnDate(employeeRules, holidayDate)) {
+            return;
+          }
+
+          const nextWorkday = this.findNextAvailableWorkday(
+            this.addDays(holidayDate, 1),
+            employeeRules,
+            blockedHolidayDates,
+          );
+
+          if (!nextWorkday) {
+            this.pushDebugSample(debug.failed.reasons, {
+              source: "holiday_compensation",
+              reason: "next_workday_not_found",
+              employee_id: employeeId,
+              original_holiday_date: holidayDate,
+              holiday: holiday?.name || holiday?.holiday_name || null,
+            });
+            return;
+          }
+
+          const originalHash = this.buildLeavehubEventHash({
+            employee_id: employeeId,
+            work_date: holidayDate,
+            day_type: this.mapHolidayToDayType(holiday),
+          });
+
+          this.setEventWithPriority(eventsMap, {
+            employee_id: employeeId,
+            work_date: nextWorkday,
+            day_type: "compensated_holiday",
+            leave_hours_data: null,
+            priority: 2,
+            source_payload_hash: `${originalHash}`,
+          });
+
+          blockedHolidayDates.add(nextWorkday);
+          this.pushDebugSample(debug.holidays.details, {
+            holiday_id: holiday?.id || null,
+            status: "generated_compensation",
+            employee_id: employeeId,
+            original_holiday_date: holidayDate,
+            compensated_date: nextWorkday,
+          });
+        });
+      });
+    });
+  }
+
   async upsertReconciledRosterEvents(
     shouldUseBulkUpsert,
     bulkUpsertPayloads,
@@ -800,6 +1040,12 @@ class IntegrationService {
     });
 
     const staffPassportById = this.buildStaffPassportMap(syncPayload.staffs);
+    const employeeRulesMap = this.buildEmployeeLeaveHubDayoffRules(
+      syncPayload.staffs,
+      syncPayload.custom_dayoffs,
+      employeeByPassport,
+      staffPassportById,
+    );
     const leaveTypeMap = this.resolveLeaveTypeMap(syncPayload.leave_types);
     const eventsMap = new Map();
     let unmatchedRecords = 0;
@@ -1008,6 +1254,14 @@ class IntegrationService {
       debug,
     );
 
+    this.appendCompensatoryHolidayEventsToMap(
+      syncPayload.holidays,
+      eventsMap,
+      allEmployeeIds,
+      employeeRulesMap,
+      debug,
+    );
+
     const events = Array.from(eventsMap.values());
     debug.reconciled.total_events = events.length;
 
@@ -1042,12 +1296,8 @@ class IntegrationService {
         work_date: event.work_date,
         day_type: event.day_type,
         leave_hours_data: event.leave_hours_data,
-        source_payload_hash: DayResolutionService.buildSnapshotHash({
-          employee_id: event.employee_id,
-          work_date: event.work_date,
-          day_type: event.day_type,
-          source_system: "leavehub",
-        }),
+        source_payload_hash:
+          event.source_payload_hash || this.buildLeavehubEventHash(event),
       });
     }
 
