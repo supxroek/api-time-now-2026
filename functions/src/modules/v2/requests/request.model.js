@@ -26,11 +26,43 @@ class RequestModel {
         ot.start_time AS ot_start_time,
         ot.end_time AS ot_end_time,
         ot.duration_hours AS ot_duration_hours,
-        ot.overtime_rate AS ot_overtime_rate
+        ot.overtime_rate AS ot_overtime_rate,
+        fs.id AS from_shift_id,
+        fs.name AS from_shift_name,
+        fs.start_time AS from_shift_start_time,
+        fs.end_time AS from_shift_end_time,
+        ts.id AS to_shift_id,
+        ts.name AS to_shift_name,
+        ts.start_time AS to_shift_start_time,
+        ts.end_time AS to_shift_end_time
       FROM requests r
-      JOIN employees emp ON emp.id = r.employee_id
-      LEFT JOIN employees appr ON appr.id = r.approver_id
-      LEFT JOIN ot_templates ot ON ot.id = r.ot_template_id
+      JOIN employees emp
+        ON emp.id = r.employee_id
+       AND emp.company_id = r.company_id
+      LEFT JOIN employees appr
+        ON appr.id = r.approver_id
+       AND appr.company_id = r.company_id
+      LEFT JOIN ot_templates ot
+        ON ot.id = r.ot_template_id
+       AND ot.company_id = r.company_id
+      LEFT JOIN shifts fs
+        ON fs.id = CAST(
+          COALESCE(
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.from_shift')),
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.from_shift_id'))
+          ) AS UNSIGNED
+        )
+       AND fs.company_id = r.company_id
+       AND fs.deleted_at IS NULL
+      LEFT JOIN shifts ts
+        ON ts.id = CAST(
+          COALESCE(
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.to_shift')),
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.to_shift_id'))
+          ) AS UNSIGNED
+        )
+       AND ts.company_id = r.company_id
+       AND ts.deleted_at IS NULL
       WHERE r.company_id = ?
     `;
 
@@ -41,9 +73,15 @@ class RequestModel {
       params.push(filters.employee_id);
     }
 
-    if (filters.status) {
-      query += " AND r.status = ?";
-      params.push(filters.status);
+    if (Array.isArray(filters.status_list) && filters.status_list.length > 0) {
+      if (filters.status_list.length === 1) {
+        query += " AND r.status = ?";
+        params.push(filters.status_list[0]);
+      } else {
+        const placeholders = filters.status_list.map(() => "?").join(", ");
+        query += ` AND r.status IN (${placeholders})`;
+        params.push(...filters.status_list);
+      }
     }
 
     if (filters.request_type) {
@@ -78,7 +116,9 @@ class RequestModel {
     let query = `
       SELECT COUNT(*) AS total
       FROM requests r
-      JOIN employees emp ON emp.id = r.employee_id
+      JOIN employees emp
+        ON emp.id = r.employee_id
+       AND emp.company_id = r.company_id
       WHERE r.company_id = ?
     `;
 
@@ -89,9 +129,15 @@ class RequestModel {
       params.push(filters.employee_id);
     }
 
-    if (filters.status) {
-      query += " AND r.status = ?";
-      params.push(filters.status);
+    if (Array.isArray(filters.status_list) && filters.status_list.length > 0) {
+      if (filters.status_list.length === 1) {
+        query += " AND r.status = ?";
+        params.push(filters.status_list[0]);
+      } else {
+        const placeholders = filters.status_list.map(() => "?").join(", ");
+        query += ` AND r.status IN (${placeholders})`;
+        params.push(...filters.status_list);
+      }
     }
 
     if (filters.request_type) {
@@ -144,11 +190,43 @@ class RequestModel {
         ot.start_time AS ot_start_time,
         ot.end_time AS ot_end_time,
         ot.duration_hours AS ot_duration_hours,
-        ot.overtime_rate AS ot_overtime_rate
+        ot.overtime_rate AS ot_overtime_rate,
+        fs.id AS from_shift_id,
+        fs.name AS from_shift_name,
+        fs.start_time AS from_shift_start_time,
+        fs.end_time AS from_shift_end_time,
+        ts.id AS to_shift_id,
+        ts.name AS to_shift_name,
+        ts.start_time AS to_shift_start_time,
+        ts.end_time AS to_shift_end_time
       FROM requests r
-      JOIN employees emp ON emp.id = r.employee_id
-      LEFT JOIN employees appr ON appr.id = r.approver_id
-      LEFT JOIN ot_templates ot ON ot.id = r.ot_template_id
+      JOIN employees emp
+        ON emp.id = r.employee_id
+       AND emp.company_id = r.company_id
+      LEFT JOIN employees appr
+        ON appr.id = r.approver_id
+       AND appr.company_id = r.company_id
+      LEFT JOIN ot_templates ot
+        ON ot.id = r.ot_template_id
+       AND ot.company_id = r.company_id
+      LEFT JOIN shifts fs
+        ON fs.id = CAST(
+          COALESCE(
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.from_shift')),
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.from_shift_id'))
+          ) AS UNSIGNED
+        )
+       AND fs.company_id = r.company_id
+       AND fs.deleted_at IS NULL
+      LEFT JOIN shifts ts
+        ON ts.id = CAST(
+          COALESCE(
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.to_shift')),
+            JSON_UNQUOTE(JSON_EXTRACT(r.request_data, '$.to_shift_id'))
+          ) AS UNSIGNED
+        )
+       AND ts.company_id = r.company_id
+       AND ts.deleted_at IS NULL
       WHERE r.id = ? AND r.company_id = ?
       LIMIT 1
     `;
