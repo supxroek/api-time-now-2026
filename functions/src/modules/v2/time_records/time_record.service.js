@@ -20,6 +20,7 @@ class TimeRecordService {
     absent: "ขาดงาน",
     leave: "ลา",
     holiday: "วันหยุด",
+    none: "ว่าง",
   };
 
   normalizeDate(value, fallback) {
@@ -68,7 +69,7 @@ class TimeRecordService {
       log_timestamp: row.log_timestamp,
       is_manual: Boolean(row.is_manual),
       status: this.mapEnum(
-        row.attendance_status || "pending",
+        row.attendance_status || "none",
         TimeRecordService.ATTENDANCE_STATUS_LABELS,
       ),
       employee: {
@@ -103,7 +104,7 @@ class TimeRecordService {
       ot_in_time: row.ot_in_time,
       ot_out_time: row.ot_out_time,
       latest_status: this.mapEnum(
-        row.latest_status || "pending",
+        row.latest_status || "none",
         TimeRecordService.ATTENDANCE_STATUS_LABELS,
       ),
     };
@@ -119,7 +120,7 @@ class TimeRecordService {
       otCheckIn: row.otCheckIn || "-",
       otCheckOut: row.otCheckOut || "-",
       status: this.mapEnum(
-        row.status || "pending",
+        row.status || "none",
         TimeRecordService.ATTENDANCE_STATUS_LABELS,
       ),
       metrics: {
@@ -154,14 +155,21 @@ class TimeRecordService {
       new Date().toISOString().slice(0, 10),
     );
 
+    const startDate = this.normalizeDate(query.start_date, selectedDate);
+    const endDate = this.normalizeDate(query.end_date, selectedDate);
+
+    if (startDate > endDate) {
+      throw new AppError("start_date ต้องน้อยกว่าหรือเท่ากับ end_date", 400);
+    }
+
     const page = this.normalizePage(query.page, 1);
     const limit = this.normalizeLimit(query.limit, 50, 200);
     const offset = (page - 1) * limit;
 
     const logFilters = this.buildLogFilters({
       ...query,
-      start_date: query.start_date || selectedDate,
-      end_date: query.end_date || selectedDate,
+      start_date: startDate,
+      end_date: endDate,
     });
 
     const summaryFilters = this.buildCommonFilters(query);
