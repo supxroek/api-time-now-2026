@@ -45,6 +45,7 @@ const shiftV2Routes = require("./modules/v2/shifts/shift.routes");
 const requestV2Routes = require("./modules/v2/requests/request.routes");
 const auditTrailV2Routes = require("./modules/v2/audit_trails/audit_trail.routes");
 const integrationV2Routes = require("./modules/v2/integrations/integration.routes");
+const dayResolutionV2Routes = require("./modules/v2/day_resolution/day_resolution.routes");
 
 // API Version prefix
 const API_VERSION_V1 = "/api";
@@ -92,6 +93,7 @@ router.use(`${API_VERSION_V2}/shifts`, shiftV2Routes);
 router.use(`${API_VERSION_V2}/requests`, requestV2Routes);
 router.use(`${API_VERSION_V2}/audit-trails`, auditTrailV2Routes);
 router.use(`${API_VERSION_V2}/integrations`, integrationV2Routes);
+router.use(`${API_VERSION_V2}/day-resolution`, dayResolutionV2Routes);
 
 /**
  * API Info route

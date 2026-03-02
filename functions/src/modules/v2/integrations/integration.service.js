@@ -3,6 +3,7 @@ const crypto = require("node:crypto");
 const AppError = require("../../../utils/AppError");
 const db = require("../../../config/db.config");
 const IntegrationModel = require("./integration.model");
+const DayResolutionService = require("../day_resolution/day_resolution.service");
 
 const {
   LEAVE_HUB_LOGIN_URL = "https://apiv2-tnlncwsaha-as.a.run.app/login",
@@ -15,6 +16,57 @@ const {
 } = process.env;
 
 class IntegrationService {
+  static THAI_MONTH_MAP = {
+    มกราคม: 1,
+    กุมภาพันธ์: 2,
+    มีนาคม: 3,
+    เมษายน: 4,
+    พฤษภาคม: 5,
+    มิถุนายน: 6,
+    กรกฎาคม: 7,
+    สิงหาคม: 8,
+    กันยายน: 9,
+    ตุลาคม: 10,
+    พฤศจิกายน: 11,
+    ธันวาคม: 12,
+    "ม.ค.": 1,
+    "ก.พ.": 2,
+    "มี.ค.": 3,
+    "เม.ย.": 4,
+    "พ.ค.": 5,
+    "มิ.ย.": 6,
+    "ก.ค.": 7,
+    "ส.ค.": 8,
+    "ก.ย.": 9,
+    "ต.ค.": 10,
+    "พ.ย.": 11,
+    "ธ.ค.": 12,
+  };
+
+  static DEFAULT_THAI_LUNAR_MAP = {
+    "ขึ้น 15 ค่ำ เดือน 3": {
+      2024: "2024-02-24",
+      2025: "2025-02-12",
+      2026: "2026-03-03",
+      2027: "2027-02-21",
+      2028: "2028-02-10",
+    },
+    "ขึ้น 15 ค่ำ เดือน 6": {
+      2024: "2024-05-22",
+      2025: "2025-05-11",
+      2026: "2026-05-31",
+      2027: "2027-05-20",
+      2028: "2028-05-08",
+    },
+    "ขึ้น 15 ค่ำ เดือน 8": {
+      2024: "2024-07-20",
+      2025: "2025-07-10",
+      2026: "2026-07-29",
+      2027: "2027-07-18",
+      2028: "2028-07-06",
+    },
+  };
+
   parseCredentialPayload(value) {
     if (!value) return null;
     if (typeof value === "string") {
@@ -155,9 +207,48 @@ class IntegrationService {
   }
 
   filterByLeavehubCompany(items, leavehubCompanyId) {
-    if (!Array.isArray(items)) return [];
+    const normalizedItems = this.extractArrayPayload(items);
+    if (!Array.isArray(normalizedItems)) return [];
+
     const targetCompanyId = Number(leavehubCompanyId);
-    return items.filter((item) => Number(item?.companyId) === targetCompanyId);
+    if (!Number.isFinite(targetCompanyId) || targetCompanyId <= 0) {
+      return normalizedItems;
+    }
+
+    return normalizedItems.filter((item) => {
+      const companyId = Number(
+        item?.companyId ??
+          item?.company_id ??
+          item?.leavehub_company_id ??
+          item?.company?.id,
+      );
+
+      if (!Number.isFinite(companyId) || companyId <= 0) {
+        return true;
+      }
+
+      return companyId === targetCompanyId;
+    });
+  }
+
+  extractArrayPayload(payload) {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (Array.isArray(payload?.data)) {
+      return payload.data;
+    }
+
+    if (Array.isArray(payload?.data?.data)) {
+      return payload.data.data;
+    }
+
+    if (Array.isArray(payload?.items)) {
+      return payload.items;
+    }
+
+    return [];
   }
 
   async fetchLeaveHubSyncData(token, leavehubCompanyId) {
@@ -223,13 +314,167 @@ class IntegrationService {
 
   summarizeSyncPayload(payload) {
     return {
-      leave_requests: payload.leave_requests.length,
-      leave_types: payload.leave_types.length,
-      swap_requests: payload.swap_requests.length,
-      staffs: payload.staffs.length,
-      custom_dayoffs: payload.custom_dayoffs.length,
-      holidays: payload.holidays.length,
+      leave_requests: Array.isArray(payload.leave_requests)
+        ? payload.leave_requests.length
+        : 0,
+      leave_types: Array.isArray(payload.leave_types)
+        ? payload.leave_types.length
+        : 0,
+      swap_requests: Array.isArray(payload.swap_requests)
+        ? payload.swap_requests.length
+        : 0,
+      staffs: Array.isArray(payload.staffs) ? payload.staffs.length : 0,
+      custom_dayoffs: Array.isArray(payload.custom_dayoffs)
+        ? payload.custom_dayoffs.length
+        : 0,
+      holidays: Array.isArray(payload.holidays) ? payload.holidays.length : 0,
     };
+  }
+
+  buildSyncDebugInput(payload) {
+    const hasEnvOverride = Boolean(process.env.LEAVE_HUB_THAI_LUNAR_MAP_JSON);
+
+    return {
+      counts: this.summarizeSyncPayload(payload),
+      lunar_mapping: {
+        env_override_enabled: hasEnvOverride,
+        default_example: IntegrationService.DEFAULT_THAI_LUNAR_MAP,
+      },
+      received_payload: {
+        leave_requests: Array.isArray(payload.leave_requests)
+          ? payload.leave_requests.slice(0, 50)
+          : [],
+        leave_types: Array.isArray(payload.leave_types)
+          ? payload.leave_types.slice(0, 50)
+          : [],
+        swap_requests: Array.isArray(payload.swap_requests)
+          ? payload.swap_requests.slice(0, 50)
+          : [],
+        staffs: Array.isArray(payload.staffs)
+          ? payload.staffs.slice(0, 50)
+          : [],
+        custom_dayoffs: Array.isArray(payload.custom_dayoffs)
+          ? payload.custom_dayoffs.slice(0, 50)
+          : [],
+        holidays: Array.isArray(payload.holidays) ? payload.holidays : [],
+      },
+    };
+  }
+
+  convertLunarDateToGregorian(lunarDate, yearInput) {
+    const normalized = String(lunarDate || "").trim();
+    if (!normalized) return null;
+
+    const dateLike = this.toDateString(normalized);
+    if (dateLike) {
+      return dateLike;
+    }
+
+    const slashPattern = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/;
+    const slashMatch = slashPattern.exec(normalized);
+    if (slashMatch) {
+      const day = Number(slashMatch[1]);
+      const month = Number(slashMatch[2]);
+      const year = Number(
+        slashMatch[3] || yearInput || new Date().getFullYear(),
+      );
+      return this.toDateString(
+        `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+      );
+    }
+
+    const mappedDate = this.resolveThaiLunarDateByMapping(
+      normalized,
+      yearInput,
+    );
+    if (mappedDate) {
+      return mappedDate;
+    }
+
+    return null;
+  }
+
+  resolveThaiLunarDateByMapping(lunarDate, yearInput) {
+    const normalizedKey = String(lunarDate || "")
+      .replaceAll(/\s+/g, " ")
+      .trim();
+
+    if (!normalizedKey) {
+      return null;
+    }
+
+    let parsedMap = {};
+    if (process.env.LEAVE_HUB_THAI_LUNAR_MAP_JSON) {
+      try {
+        parsedMap = JSON.parse(process.env.LEAVE_HUB_THAI_LUNAR_MAP_JSON);
+      } catch (error) {
+        console.warn("Invalid LEAVE_HUB_THAI_LUNAR_MAP_JSON format", error);
+      }
+    }
+
+    const mergedMap = {
+      ...IntegrationService.DEFAULT_THAI_LUNAR_MAP,
+      ...parsedMap,
+    };
+
+    const mappingValue = mergedMap[normalizedKey];
+    if (!mappingValue) {
+      return null;
+    }
+
+    if (typeof mappingValue === "string") {
+      return this.toDateString(mappingValue);
+    }
+
+    if (mappingValue && typeof mappingValue === "object") {
+      const yearKey = String(
+        Number(yearInput) || Number(new Date().getFullYear()),
+      );
+      return this.toDateString(mappingValue[yearKey]);
+    }
+
+    return null;
+  }
+
+  resolveHolidayWorkDates(holiday) {
+    const baseYear =
+      Number(holiday?.year) ||
+      Number(holiday?.holiday_year) ||
+      new Date().getFullYear();
+
+    const explicitDate = this.getDateCandidateFromRecord(
+      holiday,
+      ["holiday_date", "date", "work_date", "off_date", "start_date"],
+      { defaultYear: baseYear },
+    );
+
+    const endDate = this.getDateCandidateFromRecord(holiday, ["end_date"], {
+      defaultYear: baseYear,
+    });
+
+    if (explicitDate) {
+      return this.expandDateRange(explicitDate, endDate || explicitDate);
+    }
+
+    const lunarDate =
+      holiday?.lunar_date || holiday?.lunarDate || holiday?.holiday_lunar_date;
+
+    if (!lunarDate) {
+      return [];
+    }
+
+    const convertedDate = this.convertLunarDateToGregorian(lunarDate, baseYear);
+    if (!convertedDate) {
+      console.warn("Skip holiday due to unresolved lunar date", {
+        holiday_id: holiday?.id || null,
+        holiday_name: holiday?.holiday_name || holiday?.name || null,
+        lunar_date: lunarDate,
+        base_year: baseYear,
+      });
+      return [];
+    }
+
+    return [convertedDate];
   }
 
   normalizePassportValue(value) {
@@ -238,11 +483,50 @@ class IntegrationService {
     return normalized || null;
   }
 
-  toDateString(value) {
+  toDateString(value, options = {}) {
     if (!value) return null;
-    const parsed = new Date(value);
+
+    const normalizedRaw = String(value).trim();
+    if (!normalizedRaw) return null;
+
+    const thaiDate = this.parseThaiTextDate(normalizedRaw, options);
+    if (thaiDate) {
+      return thaiDate;
+    }
+
+    const parsed = new Date(normalizedRaw);
     if (Number.isNaN(parsed.getTime())) return null;
     return parsed.toISOString().slice(0, 10);
+  }
+
+  parseThaiTextDate(value, options = {}) {
+    const normalized = String(value || "")
+      .replaceAll(/\s+/g, " ")
+      .trim();
+
+    const thaiDatePattern = /^(\d{1,2})\s+([ก-๙.]+)(?:\s+(\d{4}))?$/;
+    const match = thaiDatePattern.exec(normalized);
+    if (!match) {
+      return null;
+    }
+
+    const day = Number(match[1]);
+    const monthToken = String(match[2]).trim();
+    const month = IntegrationService.THAI_MONTH_MAP[monthToken];
+    if (!month || !day) {
+      return null;
+    }
+
+    let year = Number(
+      match[3] || options.defaultYear || new Date().getFullYear(),
+    );
+    if (year >= 2400) {
+      year -= 543;
+    }
+
+    return this.toDateString(
+      `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    );
   }
 
   expandDateRange(startDate, endDate) {
@@ -305,12 +589,27 @@ class IntegrationService {
     );
   }
 
-  getDateCandidateFromRecord(record, keys) {
+  getDateCandidateFromRecord(record, keys, options = {}) {
     for (const key of keys) {
-      const value = this.toDateString(record?.[key]);
+      const rawValue = record?.[key];
+      const value = this.toDateString(rawValue, options);
+
+      if (!value && rawValue) {
+        const thaiDate = this.parseThaiTextDate(rawValue, options);
+        if (thaiDate) {
+          return thaiDate;
+        }
+      }
+
       if (value) return value;
     }
     return null;
+  }
+
+  pushDebugSample(targetArray, payload, limit = 200) {
+    if (!Array.isArray(targetArray)) return;
+    if (targetArray.length >= limit) return;
+    targetArray.push(payload);
   }
 
   resolveLeaveTypeMap(leaveTypes) {
@@ -401,20 +700,6 @@ class IntegrationService {
     return map;
   }
 
-  buildPayloadHash(event) {
-    return crypto
-      .createHash("sha256")
-      .update(
-        JSON.stringify({
-          employee_id: event.employee_id,
-          work_date: event.work_date,
-          day_type: event.day_type,
-          leave_hours_data: event.leave_hours_data || null,
-        }),
-      )
-      .digest("hex");
-  }
-
   async reconcileSyncPayloadToRosters(companyId, syncPayload, executor) {
     const employees = await IntegrationModel.findEmployeesForLeaveHubMapping(
       companyId,
@@ -439,6 +724,31 @@ class IntegrationService {
     const eventsMap = new Map();
     let unmatchedRecords = 0;
 
+    const debug = {
+      received: this.summarizeSyncPayload(syncPayload),
+      matched_employees: employeeByPassport.size,
+      unmatched_records: {
+        total: 0,
+        samples: [],
+      },
+      holidays: {
+        total: Array.isArray(syncPayload.holidays)
+          ? syncPayload.holidays.length
+          : 0,
+        resolved: 0,
+        skipped: 0,
+        details: [],
+      },
+      reconciled: {
+        total_events: 0,
+        by_day_type: {},
+        samples: [],
+      },
+      failed: {
+        reasons: [],
+      },
+    };
+
     (Array.isArray(syncPayload.leave_requests)
       ? syncPayload.leave_requests
       : []
@@ -452,6 +762,11 @@ class IntegrationService {
 
       if (!passport || !employeeByPassport.has(passport)) {
         unmatchedRecords += 1;
+        this.pushDebugSample(debug.unmatched_records.samples, {
+          source: "leave_request",
+          reason: "employee_not_matched_by_passport",
+          record: leaveRequest,
+        });
         return;
       }
 
@@ -467,6 +782,11 @@ class IntegrationService {
 
       if (!startDate) {
         unmatchedRecords += 1;
+        this.pushDebugSample(debug.unmatched_records.samples, {
+          source: "leave_request",
+          reason: "missing_start_date",
+          record: leaveRequest,
+        });
         return;
       }
 
@@ -508,6 +828,11 @@ class IntegrationService {
 
       if (!passport || !employeeByPassport.has(passport)) {
         unmatchedRecords += 1;
+        this.pushDebugSample(debug.unmatched_records.samples, {
+          source: "swap_request",
+          reason: "employee_not_matched_by_passport",
+          record: swapRequest,
+        });
         return;
       }
 
@@ -520,6 +845,11 @@ class IntegrationService {
 
       if (!workDate) {
         unmatchedRecords += 1;
+        this.pushDebugSample(debug.unmatched_records.samples, {
+          source: "swap_request",
+          reason: "missing_work_date",
+          record: swapRequest,
+        });
         return;
       }
 
@@ -528,7 +858,7 @@ class IntegrationService {
         work_date: workDate,
         day_type: "holiday_swap",
         leave_hours_data: null,
-        priority: 2,
+        priority: 3,
       });
     });
 
@@ -536,6 +866,14 @@ class IntegrationService {
       ? syncPayload.custom_dayoffs
       : []
     ).forEach((customDayoff) => {
+      const dayOffStatus = Number(
+        customDayoff?.dayOff_Status ?? customDayoff?.dayoff_status,
+      );
+
+      if (Number.isFinite(dayOffStatus) && dayOffStatus !== 1) {
+        return;
+      }
+
       const passport = this.getLeaveHubPassportFromRecord(
         customDayoff,
         staffPassportById,
@@ -543,6 +881,11 @@ class IntegrationService {
 
       if (!passport || !employeeByPassport.has(passport)) {
         unmatchedRecords += 1;
+        this.pushDebugSample(debug.unmatched_records.samples, {
+          source: "custom_dayoff",
+          reason: "employee_not_matched_by_passport",
+          record: customDayoff,
+        });
         return;
       }
 
@@ -551,6 +894,15 @@ class IntegrationService {
       const customDates = Array.isArray(customDayoff?.off_dates)
         ? customDayoff.off_dates
         : [customDayoff?.off_date, customDayoff?.date, customDayoff?.work_date];
+
+      if (!customDates.filter(Boolean).length) {
+        this.pushDebugSample(debug.failed.reasons, {
+          source: "custom_dayoff",
+          reason: "missing_custom_dates",
+          record: customDayoff,
+        });
+        return;
+      }
 
       customDates.forEach((dateValue) => {
         const workDate = this.toDateString(dateValue);
@@ -568,45 +920,68 @@ class IntegrationService {
 
     (Array.isArray(syncPayload.holidays) ? syncPayload.holidays : []).forEach(
       (holiday) => {
-        const holidayDate = this.getDateCandidateFromRecord(holiday, [
-          "holiday_date",
-          "date",
-          "work_date",
-          "off_date",
-        ]);
+        const holidayDates = this.resolveHolidayWorkDates(holiday);
+        if (!holidayDates.length) {
+          debug.holidays.skipped += 1;
+          this.pushDebugSample(debug.holidays.details, {
+            holiday_id: holiday?.id || null,
+            name: holiday?.name || holiday?.holiday_name || null,
+            input_date: holiday?.date || holiday?.holiday_date || null,
+            lunar_date:
+              holiday?.lunar_date ||
+              holiday?.lunarDate ||
+              holiday?.holiday_lunar_date ||
+              null,
+            status: "skipped",
+            reason: "unresolved_holiday_date",
+          });
+          return;
+        }
 
-        if (!holidayDate) return;
+        debug.holidays.resolved += 1;
+        this.pushDebugSample(debug.holidays.details, {
+          holiday_id: holiday?.id || null,
+          name: holiday?.name || holiday?.holiday_name || null,
+          input_date: holiday?.date || holiday?.holiday_date || null,
+          lunar_date:
+            holiday?.lunar_date ||
+            holiday?.lunarDate ||
+            holiday?.holiday_lunar_date ||
+            null,
+          status: "resolved",
+          resolved_dates: holidayDates,
+        });
 
         const dayType = this.mapHolidayToDayType(holiday);
 
-        allEmployeeIds.forEach((employeeId) => {
-          this.setEventWithPriority(eventsMap, {
-            employee_id: employeeId,
-            work_date: holidayDate,
-            day_type: dayType,
-            leave_hours_data: null,
-            priority: 2,
+        holidayDates.forEach((holidayDate) => {
+          allEmployeeIds.forEach((employeeId) => {
+            this.setEventWithPriority(eventsMap, {
+              employee_id: employeeId,
+              work_date: holidayDate,
+              day_type: dayType,
+              leave_hours_data: null,
+              priority: 2,
+            });
           });
         });
       },
     );
 
     const events = Array.from(eventsMap.values());
-    if (!events.length) {
-      return {
-        reconciled_rosters: 0,
-        affected_summaries: 0,
-        matched_employees: employeeByPassport.size,
-        unmatched_records: unmatchedRecords,
-      };
-    }
+    debug.reconciled.total_events = events.length;
 
     const affectedEmployeeIds = new Set();
-    let minDate = events[0].work_date;
-    let maxDate = events[0].work_date;
+    const fallbackDate = new Date().toISOString().slice(0, 10);
+    let minDate = events[0]?.work_date || fallbackDate;
+    let maxDate = events[0]?.work_date || fallbackDate;
 
     for (const event of events) {
       affectedEmployeeIds.add(event.employee_id);
+
+      debug.reconciled.by_day_type[event.day_type] =
+        (debug.reconciled.by_day_type[event.day_type] || 0) + 1;
+      this.pushDebugSample(debug.reconciled.samples, event);
 
       if (event.work_date < minDate) {
         minDate = event.work_date;
@@ -622,7 +997,12 @@ class IntegrationService {
           work_date: event.work_date,
           day_type: event.day_type,
           leave_hours_data: event.leave_hours_data,
-          source_payload_hash: this.buildPayloadHash(event),
+          source_payload_hash: DayResolutionService.buildSnapshotHash({
+            employee_id: event.employee_id,
+            work_date: event.work_date,
+            day_type: event.day_type,
+            source_system: "leavehub",
+          }),
         },
         executor,
       );
@@ -637,11 +1017,14 @@ class IntegrationService {
         executor,
       );
 
+    debug.unmatched_records.total = unmatchedRecords;
+
     return {
       reconciled_rosters: events.length,
       affected_summaries: affectedSummaries,
       matched_employees: employeeByPassport.size,
       unmatched_records: unmatchedRecords,
+      debug,
     };
   }
 
