@@ -48,6 +48,7 @@ const integrationV2Routes = require("./modules/v2/integrations/integration.route
 const dayResolutionV2Routes = require("./modules/v2/day_resolution/day_resolution.routes");
 const statsV2Routes = require("./modules/v2/stats/stats.routes");
 const dashboardV2Routes = require("./modules/v2/dashboard/dashboard.routes");
+const timeRecordV2Routes = require("./modules/v2/time_records/time_record.routes");
 
 // API Version prefix
 const API_VERSION_V1 = "/api";
@@ -98,6 +99,7 @@ router.use(`${API_VERSION_V2}/integrations`, integrationV2Routes);
 router.use(`${API_VERSION_V2}/day-resolution`, dayResolutionV2Routes);
 router.use(`${API_VERSION_V2}/stats`, statsV2Routes);
 router.use(`${API_VERSION_V2}/dashboard`, dashboardV2Routes);
+router.use(`${API_VERSION_V2}/time-records`, timeRecordV2Routes);
 
 /**
  * API Info route

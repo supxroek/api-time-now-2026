@@ -1,0 +1,270 @@
+const AppError = require("../../../utils/AppError");
+const TimeRecordModel = require("./time_record.model");
+
+class TimeRecordService {
+  static LOG_TYPE_LABELS = {
+    check_in: "เข้างาน",
+    check_out: "ออกงาน",
+    break_start: "เริ่มพัก",
+    break_end: "จบพัก",
+    ot_in: "OT เข้า",
+    ot_out: "OT ออก",
+  };
+
+  static ATTENDANCE_STATUS_LABELS = {
+    pending: "รอดำเนินการ",
+    normal: "ปกติ",
+    late: "มาสาย",
+    early_exit: "ออกก่อนเวลา",
+    late_and_early_exit: "มาสายและออกก่อนเวลา",
+    absent: "ขาดงาน",
+    leave: "ลา",
+    holiday: "วันหยุด",
+  };
+
+  normalizeDate(value, fallback) {
+    const dateString = String(value || fallback || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      throw new AppError("รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)", 400);
+    }
+
+    return dateString;
+  }
+
+  normalizePage(value, fallback = 1) {
+    const parsed = Number(value ?? fallback);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return fallback;
+    }
+
+    return Math.floor(parsed);
+  }
+
+  normalizeLimit(value, fallback = 50, max = 200) {
+    const parsed = Number(value ?? fallback);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return fallback;
+    }
+
+    return Math.min(Math.floor(parsed), max);
+  }
+
+  mapEnum(key, labels) {
+    if (!key) return null;
+
+    return {
+      key,
+      label: labels[key] || key,
+    };
+  }
+
+  mapRealtimeLog(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      employee_id: row.employee_id,
+      device_id: row.device_id,
+      log_type: this.mapEnum(row.log_type, TimeRecordService.LOG_TYPE_LABELS),
+      log_timestamp: row.log_timestamp,
+      is_manual: Boolean(row.is_manual),
+      status: this.mapEnum(
+        row.attendance_status || "pending",
+        TimeRecordService.ATTENDANCE_STATUS_LABELS,
+      ),
+      employee: {
+        id: row.employee_id,
+        code: row.employee_code,
+        name: row.employee_name,
+        avatar: row.employee_avatar,
+        department_id: row.department_id,
+        department_name: row.department_name,
+      },
+      device: row.device_id
+        ? {
+            id: row.device_id,
+            name: row.device_name,
+            location_name: row.location_name,
+          }
+        : null,
+    };
+  }
+
+  mapDailySummaryRow(row) {
+    return {
+      employee_id: row.employee_id,
+      employee_code: row.employee_code,
+      employee_name: row.employee_name,
+      employee_avatar: row.employee_avatar,
+      department_name: row.department_name,
+      check_in_time: row.check_in_time,
+      break_start_time: row.break_start_time,
+      break_end_time: row.break_end_time,
+      check_out_time: row.check_out_time,
+      ot_in_time: row.ot_in_time,
+      ot_out_time: row.ot_out_time,
+      latest_status: this.mapEnum(
+        row.latest_status || "pending",
+        TimeRecordService.ATTENDANCE_STATUS_LABELS,
+      ),
+    };
+  }
+
+  mapHistoryRow(row) {
+    return {
+      date: row.date,
+      checkIn: row.checkIn || "-",
+      breakStart: row.breakStart || "-",
+      breakEnd: row.breakEnd || "-",
+      checkOut: row.checkOut || "-",
+      otCheckIn: row.otCheckIn || "-",
+      otCheckOut: row.otCheckOut || "-",
+      status: this.mapEnum(
+        row.status || "pending",
+        TimeRecordService.ATTENDANCE_STATUS_LABELS,
+      ),
+      metrics: {
+        total_work_minutes: Number(row.total_work_minutes || 0),
+        break_minutes: Number(row.break_minutes || 0),
+        late_minutes: Number(row.late_minutes || 0),
+        early_exit_minutes: Number(row.early_exit_minutes || 0),
+        total_ot_minutes: Number(row.total_ot_minutes || 0),
+      },
+    };
+  }
+
+  buildCommonFilters(query = {}) {
+    return {
+      department_id: query.department_id,
+      search: query.search?.trim(),
+    };
+  }
+
+  buildLogFilters(query = {}) {
+    return {
+      ...this.buildCommonFilters(query),
+      log_type: query.log_type,
+      start_date: query.start_date,
+      end_date: query.end_date,
+    };
+  }
+
+  async getOverview(companyId, query = {}) {
+    const selectedDate = this.normalizeDate(
+      query.date,
+      new Date().toISOString().slice(0, 10),
+    );
+
+    const page = this.normalizePage(query.page, 1);
+    const limit = this.normalizeLimit(query.limit, 50, 200);
+    const offset = (page - 1) * limit;
+
+    const logFilters = this.buildLogFilters({
+      ...query,
+      start_date: query.start_date || selectedDate,
+      end_date: query.end_date || selectedDate,
+    });
+
+    const summaryFilters = this.buildCommonFilters(query);
+
+    const [departments, statsRow, logsRows, logsTotal, summaryRows] =
+      await Promise.all([
+        TimeRecordModel.getDepartmentOptions(companyId),
+        TimeRecordModel.getOverviewStats(
+          companyId,
+          selectedDate,
+          summaryFilters,
+        ),
+        TimeRecordModel.getRealtimeLogs(companyId, logFilters, limit, offset),
+        TimeRecordModel.countRealtimeLogs(companyId, logFilters),
+        TimeRecordModel.getDailySummary(
+          companyId,
+          selectedDate,
+          summaryFilters,
+        ),
+      ]);
+
+    const stats = {
+      total_employees: Number(statsRow.total_employees || 0),
+      came_to_work: Number(statsRow.came_to_work || 0),
+      late: Number(statsRow.late || 0),
+      absent: Number(statsRow.absent || 0),
+    };
+
+    return {
+      filters: {
+        selected_date: selectedDate,
+        start_date: logFilters.start_date,
+        end_date: logFilters.end_date,
+        department_id: summaryFilters.department_id || null,
+        search: summaryFilters.search || "",
+        log_type: logFilters.log_type || null,
+      },
+      stats,
+      departments: departments.map((department) => ({
+        id: department.id,
+        department_name: department.department_name,
+      })),
+      realtime_logs: {
+        logs: logsRows.map((row) => this.mapRealtimeLog(row)),
+        meta: {
+          total: logsTotal,
+          page,
+          limit,
+          total_pages: Math.max(Math.ceil(logsTotal / limit), 1),
+        },
+      },
+      daily_summary: {
+        total: summaryRows.length,
+        records: summaryRows.map((row) => this.mapDailySummaryRow(row)),
+      },
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  async getEmployeeHistory(companyId, employeeId, query = {}) {
+    const employeeIdNumber = Number(employeeId);
+    if (!Number.isFinite(employeeIdNumber) || employeeIdNumber <= 0) {
+      throw new AppError("employeeId ไม่ถูกต้อง", 400);
+    }
+
+    const startDate = this.normalizeDate(
+      query.start_date,
+      new Date(new Date().setDate(new Date().getDate() - 30))
+        .toISOString()
+        .slice(0, 10),
+    );
+    const endDate = this.normalizeDate(
+      query.end_date,
+      new Date().toISOString().slice(0, 10),
+    );
+
+    if (startDate > endDate) {
+      throw new AppError("start_date ต้องน้อยกว่าหรือเท่ากับ end_date", 400);
+    }
+
+    const employee = await TimeRecordModel.findEmployeeById(
+      companyId,
+      employeeIdNumber,
+    );
+
+    if (!employee) {
+      throw new AppError("ไม่พบพนักงานในบริษัทนี้", 404);
+    }
+
+    const rows = await TimeRecordModel.getEmployeeHistory(
+      companyId,
+      employeeIdNumber,
+      startDate,
+      endDate,
+    );
+
+    return {
+      employee_id: employeeIdNumber,
+      start_date: startDate,
+      end_date: endDate,
+      history: rows.map((row) => this.mapHistoryRow(row)),
+    };
+  }
+}
+
+module.exports = new TimeRecordService();
