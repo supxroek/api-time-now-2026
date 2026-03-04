@@ -57,6 +57,124 @@ class CompanyService {
     return company;
   }
 
+  normalizeOverviewLimit(value, fallback, max) {
+    const parsed = Number(value ?? fallback);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return fallback;
+    }
+
+    return Math.min(Math.floor(parsed), max);
+  }
+
+  mapDepartmentRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      department_name: row.department_name,
+      head_employee_id: row.head_employee_id,
+      head_employee: row.head_employee_id
+        ? {
+            id: row.head_employee_id,
+            name: row.head_employee_name,
+            employee_code: row.head_employee_code,
+          }
+        : null,
+      employee_count: Number(row.employee_count || 0),
+    };
+  }
+
+  mapDeviceRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      name: row.name,
+      location_name: row.location_name,
+      description: row.description,
+      hwid: row.hwid,
+      passcode: row.passcode,
+      is_active: Number(row.is_active || 0),
+      last_sync: row.last_sync,
+      access_control_count: Number(row.access_control_count || 0),
+    };
+  }
+
+  mapEmployeeRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      employee_code: row.employee_code,
+      department_id: row.department_id,
+      department_name: row.department_name,
+      name: row.name,
+      email: row.email,
+      image_url: row.image_url,
+      phone_number: row.phone_number,
+      status: row.status,
+      start_date: row.start_date,
+      resign_date: row.resign_date,
+    };
+  }
+
+  async getOverview(companyId, query = {}) {
+    const employeeLimit = this.normalizeOverviewLimit(
+      query.employee_limit,
+      1000,
+      3000,
+    );
+    const departmentLimit = this.normalizeOverviewLimit(
+      query.department_limit,
+      500,
+      1000,
+    );
+    const deviceLimit = this.normalizeOverviewLimit(
+      query.device_limit,
+      500,
+      1000,
+    );
+    const targetDate = String(
+      query.date || new Date().toISOString().slice(0, 10),
+    );
+
+    const [company, departmentsRaw, devicesRaw, employeesRaw, deviceStats] =
+      await Promise.all([
+        this.getCompanyProfile(companyId),
+        CompanyModel.listDepartmentsForOverview(companyId, departmentLimit),
+        CompanyModel.listDevicesForOverview(companyId, deviceLimit),
+        CompanyModel.listEmployeesForOverview(companyId, employeeLimit),
+        CompanyModel.getDeviceUsageStats(companyId, targetDate),
+      ]);
+
+    const departments = departmentsRaw.map((row) => this.mapDepartmentRow(row));
+    const devices = devicesRaw.map((row) => this.mapDeviceRow(row));
+    const employees = employeesRaw.map((row) => this.mapEmployeeRow(row));
+
+    return {
+      company,
+      departments: {
+        total: departments.length,
+        items: departments,
+      },
+      devices: {
+        total: devices.length,
+        items: devices,
+        stats: {
+          total: Number(deviceStats.total_devices || 0),
+          online: Number(deviceStats.online_devices || 0),
+          offline: Number(deviceStats.offline_devices || 0),
+          assigned: Number(deviceStats.assigned_devices || 0),
+          today: Number(deviceStats.today_logs || 0),
+          success: Number(deviceStats.success_logs || 0),
+          failed: Number(deviceStats.failed_logs || 0),
+        },
+      },
+      employees: {
+        total: employees.length,
+        items: employees,
+      },
+      generated_at: new Date().toISOString(),
+    };
+  }
+
   async updateCompanyProfile(user, payload, ipAddress) {
     const companyId = user.company_id;
     const oldCompany = await CompanyModel.findProfileByCompanyId(companyId);

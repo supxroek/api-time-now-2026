@@ -7,6 +7,14 @@ const router = express.Router();
 router.use(protect);
 
 router
+  // Endpoint: GET /api/v2/companies/overview
+  .route("/overview")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    companyController.getOverview,
+  );
+
+router
   // Endpoint: GET /api/v2/companies/profile
   .route("/profile")
   .get(
