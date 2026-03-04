@@ -87,7 +87,7 @@ class AuditTrailService {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        total_pages: Math.ceil(total / limit),
       },
       stats: {
         total: Number(stats.total || 0),
