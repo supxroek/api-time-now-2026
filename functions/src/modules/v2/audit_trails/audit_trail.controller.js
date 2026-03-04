@@ -2,6 +2,18 @@ const catchAsync = require("../../../utils/catchAsync");
 const AuditTrailService = require("./audit_trail.service");
 
 class AuditTrailController {
+  getOverview = catchAsync(async (req, res, _next) => {
+    const result = await AuditTrailService.getAuditTrailList(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   getList = catchAsync(async (req, res, _next) => {
     const result = await AuditTrailService.getAuditTrailList(
       req.user.company_id,

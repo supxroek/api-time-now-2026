@@ -2,6 +2,18 @@ const catchAsync = require("../../../utils/catchAsync");
 const UserService = require("./user.service");
 
 class UserController {
+  getOverview = catchAsync(async (req, res, _next) => {
+    const result = await UserService.getOverview(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   getAll = catchAsync(async (req, res, _next) => {
     const result = await UserService.getAllUsers(
       req.user.company_id,

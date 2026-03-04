@@ -7,6 +7,11 @@ const router = express.Router();
 router.use(protect);
 
 router
+  // Endpoint: GET /api/v2/users/overview
+  .route("/overview")
+  .get(restrictTo("super_admin", "admin"), userController.getOverview);
+
+router
   // Endpoint: GET /api/v2/users
   .route("/")
   .get(restrictTo("super_admin", "admin"), userController.getAll);

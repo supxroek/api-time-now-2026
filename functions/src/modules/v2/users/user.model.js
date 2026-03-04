@@ -66,6 +66,31 @@ class UserModel {
     return rows[0].total;
   }
 
+  async getOverviewStats(companyId) {
+    const query = `
+      SELECT
+        COUNT(*) AS total_users,
+        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_users,
+        SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) AS inactive_users,
+        SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count,
+        SUM(CASE WHEN role = 'manager' THEN 1 ELSE 0 END) AS manager_count,
+        SUM(CASE WHEN role = 'super_admin' THEN 1 ELSE 0 END) AS super_admin_count
+      FROM users
+      WHERE company_id = ?
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return (
+      rows[0] || {
+        total_users: 0,
+        active_users: 0,
+        admin_count: 0,
+        manager_count: 0,
+        super_admin_count: 0,
+      }
+    );
+  }
+
   async updateRole(id, companyId, data) {
     const query = `
       UPDATE users

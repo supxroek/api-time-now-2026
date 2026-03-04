@@ -47,6 +47,37 @@ class UserService {
     };
   }
 
+  async getOverview(companyId, query = {}) {
+    const page = Math.max(Number(query.page || 1), 1);
+    const limit = Math.min(Math.max(Number(query.limit || 1000), 1), 1000);
+    const offset = (page - 1) * limit;
+    const search = query.search?.trim() || "";
+
+    const [users, total, stats] = await Promise.all([
+      UserModel.findAllByCompanyId(companyId, limit, offset, search),
+      UserModel.countAllByCompanyId(companyId, search),
+      UserModel.getOverviewStats(companyId),
+    ]);
+
+    return {
+      users,
+      stats: {
+        total_users: Number(stats.total_users || 0),
+        active_users: Number(stats.active_users || 0),
+        inactive_users: Number(stats.inactive_users || 0),
+        admin_count: Number(stats.admin_count || 0),
+        manager_count: Number(stats.manager_count || 0),
+        super_admin_count: Number(stats.super_admin_count || 0),
+      },
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   async updateRole(user, userId, payload, ip) {
     const filteredPayload = this.filterAllowedFields(payload);
 

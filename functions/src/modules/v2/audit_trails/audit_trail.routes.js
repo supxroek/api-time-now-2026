@@ -7,6 +7,11 @@ const router = express.Router();
 router.use(protect);
 
 router
+  // Endpoint: GET /api/v2/audit-trails/overview
+  .route("/overview")
+  .get(restrictTo("super_admin", "admin"), controller.getOverview);
+
+router
   .route("/stats")
   .get(restrictTo("super_admin", "admin"), controller.getStats);
 
