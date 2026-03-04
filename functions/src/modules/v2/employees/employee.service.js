@@ -67,6 +67,7 @@ class EmployeeService {
       try {
         days = JSON.parse(weeklyDays);
       } catch (_error) {
+        console.warn("Failed to parse weekly_days JSON:", _error);
         return [];
       }
     }
