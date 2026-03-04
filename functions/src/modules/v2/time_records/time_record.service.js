@@ -166,6 +166,15 @@ class TimeRecordService {
     const limit = this.normalizeLimit(query.limit, 50, 200);
     const offset = (page - 1) * limit;
 
+    // Daily summary pagination
+    const pageDailySummary = this.normalizePage(query.daily_summary_page, 1);
+    const dailySummaryLimit = this.normalizeLimit(
+      query.daily_summary_limit,
+      20,
+      100,
+    );
+    const offsetDailySummary = (pageDailySummary - 1) * dailySummaryLimit;
+
     const logFilters = this.buildLogFilters({
       ...query,
       start_date: startDate,
@@ -174,22 +183,27 @@ class TimeRecordService {
 
     const summaryFilters = this.buildCommonFilters(query);
 
-    const [departments, statsRow, logsRows, logsTotal, summaryRows] =
-      await Promise.all([
-        TimeRecordModel.getDepartmentOptions(companyId),
-        TimeRecordModel.getOverviewStats(
-          companyId,
-          selectedDate,
-          summaryFilters,
-        ),
-        TimeRecordModel.getRealtimeLogs(companyId, logFilters, limit, offset),
-        TimeRecordModel.countRealtimeLogs(companyId, logFilters),
-        TimeRecordModel.getDailySummary(
-          companyId,
-          selectedDate,
-          summaryFilters,
-        ),
-      ]);
+    const [
+      departments,
+      statsRow,
+      logsRows,
+      logsTotal,
+      summaryTotal,
+      summaryRows,
+    ] = await Promise.all([
+      TimeRecordModel.getDepartmentOptions(companyId),
+      TimeRecordModel.getOverviewStats(companyId, selectedDate, summaryFilters),
+      TimeRecordModel.getRealtimeLogs(companyId, logFilters, limit, offset),
+      TimeRecordModel.countRealtimeLogs(companyId, logFilters),
+      TimeRecordModel.countActiveEmployees(companyId, summaryFilters),
+      TimeRecordModel.getDailySummary(
+        companyId,
+        selectedDate,
+        summaryFilters,
+        dailySummaryLimit,
+        offsetDailySummary,
+      ),
+    ]);
 
     const stats = {
       total_employees: Number(statsRow.total_employees || 0),
@@ -222,7 +236,10 @@ class TimeRecordService {
         },
       },
       daily_summary: {
-        total: summaryRows.length,
+        total: summaryTotal,
+        limit: dailySummaryLimit,
+        page: pageDailySummary,
+        total_pages: Math.max(Math.ceil(summaryTotal / dailySummaryLimit), 1),
         records: summaryRows.map((row) => this.mapDailySummaryRow(row)),
       },
       generated_at: new Date().toISOString(),

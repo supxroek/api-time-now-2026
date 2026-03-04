@@ -181,7 +181,13 @@ class TimeRecordModel {
     return Number(rows[0]?.total || 0);
   }
 
-  async getDailySummary(companyId, targetDate, filters = {}) {
+  async getDailySummary(
+    companyId,
+    targetDate,
+    filters = {},
+    dailySummaryLimit = 50,
+    offset = 0,
+  ) {
     const employeeFilter = this.buildEmployeeFilters(filters);
 
     const query = `
@@ -230,6 +236,7 @@ class TimeRecordModel {
         AND e.status = 'active'
         ${employeeFilter.clause}
       ORDER BY e.employee_code ASC, e.id ASC
+      LIMIT ? OFFSET ?
     `;
 
     const params = [
@@ -239,6 +246,8 @@ class TimeRecordModel {
       targetDate,
       companyId,
       ...employeeFilter.params,
+      dailySummaryLimit,
+      offset,
     ];
 
     const [rows] = await db.query(query, params);
