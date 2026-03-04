@@ -1,6 +1,154 @@
 const db = require("../../../config/db.config");
 
 class EmployeeModel {
+  async findOverviewByCompanyId(companyId, filters = {}, limit = 2000) {
+    let query = `
+      SELECT
+        e.id,
+        e.company_id,
+        e.employee_code,
+        e.department_id,
+        e.name,
+        e.email,
+        e.image_url,
+        e.phone_number,
+        e.id_or_passport_number,
+        e.line_user_id,
+        e.start_date,
+        e.resign_date,
+        e.status,
+        e.created_at,
+        d.department_name,
+        esa.shift_mode,
+        esa.shift_id AS default_shift_id,
+        esa.effective_from AS shift_effective_from,
+        eda.dayoff_mode,
+        eda.weekly_days,
+        eda.effective_from AS dayoff_effective_from
+      FROM employees e
+      LEFT JOIN departments d
+        ON d.id = e.department_id
+       AND d.company_id = e.company_id
+      LEFT JOIN employee_shift_assignments esa
+        ON esa.employee_id = e.id
+       AND esa.company_id = e.company_id
+       AND esa.effective_to IS NULL
+      LEFT JOIN employee_dayoff_assignments eda
+        ON eda.employee_id = e.id
+       AND eda.company_id = e.company_id
+       AND eda.effective_to IS NULL
+      WHERE e.company_id = ?
+        AND e.deleted_at IS NULL
+    `;
+    const params = [companyId];
+
+    if (filters.search) {
+      query += ` AND (e.name LIKE ? OR e.employee_code LIKE ? OR e.email LIKE ?)`;
+      const keyword = `%${filters.search}%`;
+      params.push(keyword, keyword, keyword);
+    }
+
+    if (filters.status) {
+      query += " AND e.status = ?";
+      params.push(filters.status);
+    }
+
+    if (filters.department_id) {
+      query += " AND e.department_id = ?";
+      params.push(Number(filters.department_id));
+    }
+
+    query += " ORDER BY e.name ASC, e.id ASC LIMIT ?";
+    params.push(limit);
+
+    const [rows] = await db.query(query, params);
+    return rows;
+  }
+
+  async findDepartmentsByCompanyId(companyId) {
+    const query = `
+      SELECT
+        d.id,
+        d.company_id,
+        d.department_name,
+        d.head_employee_id
+      FROM departments d
+      WHERE d.company_id = ?
+      ORDER BY d.department_name ASC, d.id ASC
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows;
+  }
+
+  async findShiftsByCompanyId(companyId) {
+    const query = `
+      SELECT
+        s.id,
+        s.company_id,
+        s.name,
+        s.type,
+        s.start_time,
+        s.end_time,
+        s.is_break,
+        s.break_start_time,
+        s.break_end_time,
+        s.is_night_shift,
+        s.deleted_at
+      FROM shifts s
+      WHERE s.company_id = ?
+      ORDER BY s.name ASC, s.id ASC
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows;
+  }
+
+  async findCompanyDepartmentModuleState(companyId) {
+    const query = `
+      SELECT cm.is_enabled
+      FROM company_modules cm
+      JOIN modules m
+        ON m.id = cm.module_id
+      WHERE cm.company_id = ?
+        AND m.module_key = 'department'
+      LIMIT 1
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows[0] || null;
+  }
+
+  async removeFutureRostersByEmployee(companyId, employeeId, fromDate) {
+    const query = `
+      DELETE r
+      FROM rosters r
+      LEFT JOIN requests req
+        ON req.roster_id = r.id
+       AND req.company_id = r.company_id
+      WHERE r.company_id = ?
+        AND r.employee_id = ?
+        AND r.work_date >= ?
+        AND req.id IS NULL
+    `;
+
+    const [result] = await db.query(query, [companyId, employeeId, fromDate]);
+    return Number(result.affectedRows || 0);
+  }
+
+  async countFutureRostersByEmployee(companyId, employeeId, fromDate) {
+    const query = `
+      SELECT COUNT(*) AS total
+      FROM rosters r
+      WHERE r.company_id = ?
+        AND r.employee_id = ?
+        AND r.work_date >= ?
+    `;
+
+    const [rows] = await db.query(query, [companyId, employeeId, fromDate]);
+    return Number(rows[0]?.total || 0);
+  }
+
   async findAllByCompanyId(companyId, filters = {}, limit = 20, offset = 0) {
     let query = `
       SELECT

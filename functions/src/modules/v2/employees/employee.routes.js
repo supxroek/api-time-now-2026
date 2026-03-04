@@ -7,6 +7,14 @@ const router = express.Router();
 router.use(protect);
 
 router
+  // Endpoint: GET /api/v2/employees/overview
+  .route("/overview")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    employeeController.getOverview,
+  );
+
+router
   // Endpoint: GET /api/v2/employees
   .route("/")
   .get(
@@ -35,6 +43,14 @@ router
   .patch(
     restrictTo("super_admin", "admin"),
     employeeController.switchDayoffMode,
+  );
+
+router
+  // Endpoint: DELETE /api/v2/employees/:id/future-rosters
+  .route("/:id/future-rosters")
+  .delete(
+    restrictTo("super_admin", "admin"),
+    employeeController.clearFutureRosters,
   );
 
 module.exports = router;

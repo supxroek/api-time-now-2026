@@ -2,6 +2,18 @@ const catchAsync = require("../../../utils/catchAsync");
 const EmployeeService = require("./employee.service");
 
 class EmployeeController {
+  getOverview = catchAsync(async (req, res, _next) => {
+    const result = await EmployeeService.getEmployeeOverview(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   getAll = catchAsync(async (req, res, _next) => {
     const result = await EmployeeService.getAllEmployees(
       req.user.company_id,
@@ -69,6 +81,19 @@ class EmployeeController {
       req.params.id,
       req.body,
       req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
+  clearFutureRosters = catchAsync(async (req, res, _next) => {
+    const result = await EmployeeService.clearFutureRosters(
+      req.user,
+      req.params.id,
+      req.query,
     );
 
     res.status(200).json({
