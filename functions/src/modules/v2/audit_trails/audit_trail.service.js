@@ -34,6 +34,29 @@ class AuditTrailService {
     return value;
   }
 
+  // กรองข้อมูลสำคัญที่ไม่ควรแสดงใน old_values หรือ new_values
+  filterSensitiveData(data) {
+    if (data === null || data === undefined) {
+      return null;
+    }
+    const SENSITIVE_FIELDS = new Set(["password", "password_hash", "ssn"]);
+    if (typeof data === "object" && !Array.isArray(data)) {
+      const filtered = {};
+      Object.keys(data).forEach((key) => {
+        if (SENSITIVE_FIELDS.has(key)) {
+          filtered[key] = "****";
+        } else {
+          filtered[key] = this.filterSensitiveData(data[key]);
+        }
+      });
+      return filtered;
+    } else if (Array.isArray(data)) {
+      return data.map((item) => this.filterSensitiveData(item));
+    } else {
+      return data;
+    }
+  }
+
   mapAuditTrailRow(row) {
     return {
       id: row.id,
@@ -44,8 +67,8 @@ class AuditTrailService {
       ),
       table_name: row.table_name,
       record_id: row.record_id,
-      old_values: this.parseJsonField(row.old_values),
-      new_values: this.parseJsonField(row.new_values),
+      old_values: this.filterSensitiveData(this.parseJsonField(row.old_values)),
+      new_values: this.filterSensitiveData(this.parseJsonField(row.new_values)),
       ip_address: row.ip_address,
       created_at: row.created_at,
       actor: {
