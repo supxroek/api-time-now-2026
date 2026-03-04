@@ -25,6 +25,14 @@ class OtTemplateController {
     });
   });
 
+  getOverview = catchAsync(async (req, res, _next) => {
+    const result = await OtTemplateService.getOverview(req.user.company_id);
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   getOne = catchAsync(async (req, res, _next) => {
     const template = await OtTemplateService.getTemplateById(
       req.user.company_id,

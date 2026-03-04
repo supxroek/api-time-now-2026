@@ -45,6 +45,57 @@ class OtTemplateModel {
     return rows;
   }
 
+  async findOverviewByCompanyId(companyId) {
+    const query = `
+      SELECT
+        ot.id,
+        ot.company_id,
+        ot.name,
+        ot.start_time,
+        ot.end_time,
+        ot.duration_hours,
+        ot.overtime_rate,
+        ot.is_active,
+        ot.deleted_at,
+        COUNT(r.id) AS usage_count
+      FROM ot_templates ot
+      LEFT JOIN requests r
+        ON r.company_id = ot.company_id
+       AND r.ot_template_id = ot.id
+       AND r.request_type = 'ot'
+      WHERE ot.company_id = ?
+        AND ot.deleted_at IS NULL
+      GROUP BY
+        ot.id,
+        ot.company_id,
+        ot.name,
+        ot.start_time,
+        ot.end_time,
+        ot.duration_hours,
+        ot.overtime_rate,
+        ot.is_active,
+        ot.deleted_at
+      ORDER BY ot.id DESC
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows;
+  }
+
+  async countOverviewByCompanyId(companyId) {
+    const query = `
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_count
+      FROM ot_templates
+      WHERE company_id = ?
+        AND deleted_at IS NULL
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows[0] || { total: 0, active_count: 0 };
+  }
+
   async countAllByCompanyId(companyId, search = "") {
     let query = `
       SELECT COUNT(*) AS total

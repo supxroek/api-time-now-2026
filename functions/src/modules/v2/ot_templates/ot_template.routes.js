@@ -7,6 +7,11 @@ const router = express.Router();
 router.use(protect);
 
 router
+  // Endpoint: GET /api/v2/ot-templates/overview
+  .route("/overview")
+  .get(restrictTo("super_admin", "admin", "manager"), controller.getOverview);
+
+router
   // Endpoint: GET /api/v2/ot-templates
   .route("/")
   .get(restrictTo("super_admin", "admin", "manager"), controller.getAll)

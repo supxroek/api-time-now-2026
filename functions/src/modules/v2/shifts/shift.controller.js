@@ -26,6 +26,14 @@ class ShiftController {
     });
   });
 
+  getOverview = catchAsync(async (req, res, _next) => {
+    const result = await ShiftService.getShiftOverview(req.user.company_id);
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   getOne = catchAsync(async (req, res, _next) => {
     const shift = await ShiftService.getShiftById(
       req.user.company_id,

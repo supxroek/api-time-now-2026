@@ -7,6 +7,14 @@ const router = express.Router();
 router.use(protect);
 
 router
+  // Endpoint: GET /api/v2/shifts/overview
+  .route("/overview")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    shiftController.getOverview,
+  );
+
+router
   // Endpoint: GET /api/v2/shifts
   .route("/")
   .get(restrictTo("super_admin", "admin", "manager"), shiftController.getAll)

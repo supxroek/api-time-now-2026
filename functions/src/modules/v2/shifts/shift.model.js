@@ -52,6 +52,55 @@ class ShiftModel {
     return rows;
   }
 
+  async findOverviewByCompanyId(companyId) {
+    const query = `
+      SELECT
+        id,
+        company_id,
+        name,
+        type,
+        start_time,
+        end_time,
+        is_break,
+        break_start_time,
+        break_end_time,
+        is_night_shift,
+        deleted_at
+      FROM shifts
+      WHERE company_id = ?
+        AND deleted_at IS NULL
+      ORDER BY id ASC
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows;
+  }
+
+  async countOverviewByCompanyId(companyId) {
+    const query = `
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN type = 'fixed' THEN 1 ELSE 0 END) AS fixed_count,
+        SUM(CASE WHEN type = 'flexible' THEN 1 ELSE 0 END) AS flexible_count,
+        SUM(CASE WHEN is_night_shift = 1 THEN 1 ELSE 0 END) AS night_shift_count,
+        SUM(CASE WHEN is_break = 1 THEN 1 ELSE 0 END) AS with_break_count
+      FROM shifts
+      WHERE company_id = ?
+        AND deleted_at IS NULL
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return (
+      rows[0] || {
+        total: 0,
+        fixed_count: 0,
+        flexible_count: 0,
+        night_shift_count: 0,
+        with_break_count: 0,
+      }
+    );
+  }
+
   async countAllByCompanyId(companyId, filters = {}) {
     let query = `
       SELECT COUNT(*) AS total

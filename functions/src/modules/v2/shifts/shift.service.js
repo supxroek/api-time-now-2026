@@ -201,6 +201,40 @@ class ShiftService {
     };
   }
 
+  getShiftTypeInfo(type) {
+    const key = type === "flexible" ? "flexible" : "fixed";
+    return {
+      key,
+      label: key === "fixed" ? "Fixed Time" : "Flexible",
+    };
+  }
+
+  async getShiftOverview(companyId) {
+    const [rows, summaryRow] = await Promise.all([
+      ShiftModel.findOverviewByCompanyId(companyId),
+      ShiftModel.countOverviewByCompanyId(companyId),
+    ]);
+
+    const shifts = (rows || []).map((row) => ({
+      ...row,
+      type_info: this.getShiftTypeInfo(row.type),
+    }));
+
+    return {
+      shifts,
+      summary: {
+        total: Number(summaryRow.total || 0),
+        fixed_count: Number(summaryRow.fixed_count || 0),
+        flexible_count: Number(summaryRow.flexible_count || 0),
+        night_shift_count: Number(summaryRow.night_shift_count || 0),
+        with_break_count: Number(summaryRow.with_break_count || 0),
+      },
+      meta: {
+        generated_at: new Date().toISOString(),
+      },
+    };
+  }
+
   async getShiftById(companyId, shiftId) {
     const shift = await ShiftModel.findByIdAndCompanyId(shiftId, companyId);
     if (!shift) {

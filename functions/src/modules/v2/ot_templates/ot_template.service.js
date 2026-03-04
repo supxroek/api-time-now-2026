@@ -169,6 +169,37 @@ class OtTemplateService {
     };
   }
 
+  async getOverview(companyId) {
+    const [rows, summaryRow] = await Promise.all([
+      OtTemplateModel.findOverviewByCompanyId(companyId),
+      OtTemplateModel.countOverviewByCompanyId(companyId),
+    ]);
+
+    const templates = (rows || []).map((row) => ({
+      ...row,
+      usage: {
+        count: Number(row.usage_count || 0),
+      },
+    }));
+
+    const totalUsage = templates.reduce(
+      (acc, template) => acc + Number(template.usage?.count || 0),
+      0,
+    );
+
+    return {
+      templates,
+      summary: {
+        total: Number(summaryRow.total || 0),
+        active_count: Number(summaryRow.active_count || 0),
+        total_usage: totalUsage,
+      },
+      meta: {
+        generated_at: new Date().toISOString(),
+      },
+    };
+  }
+
   async getTemplateById(companyId, templateId) {
     const template = await OtTemplateModel.findByIdAndCompanyId(
       templateId,
