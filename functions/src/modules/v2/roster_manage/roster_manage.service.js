@@ -155,7 +155,9 @@ class RosterManageV2Service {
   }
 
   async bulkUpsert(companyId, user, payload, ipAddress, options = {}) {
-    const workspaceMode = this.normalizeWorkspaceMode(options?.mode || "unified");
+    const workspaceMode = this.normalizeWorkspaceMode(
+      options?.mode || "unified",
+    );
     const rosterData = payload?.roster_data;
     if (!rosterData || typeof rosterData !== "object") {
       throw new AppError("กรุณาระบุ roster_data ให้ถูกต้อง", 400);
@@ -182,12 +184,13 @@ class RosterManageV2Service {
     const todayWithLogs = new Set();
     if (workspaceMode === "shift") {
       const today = dayjs().format("YYYY-MM-DD");
-      const attendanceToday = await RosterManageV2Model.findAttendanceFlagsByDateRange(
-        companyId,
-        today,
-        today,
-        employeeIds,
-      );
+      const attendanceToday =
+        await RosterManageV2Model.findAttendanceFlagsByDateRange(
+          companyId,
+          today,
+          today,
+          employeeIds,
+        );
 
       attendanceToday.forEach((row) => {
         if (row?.first_check_in) {
