@@ -15,6 +15,14 @@ router
   );
 
 router
+  // Endpoint: GET /api/v2/integrations/leavehub/roster-context
+  .route("/leavehub/roster-context")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    controller.getLeaveHubRosterContext,
+  );
+
+router
   // Endpoint: POST /api/v2/integrations/leavehub/connect
   .route("/leavehub/connect")
   .post(restrictTo("super_admin", "admin"), controller.connectLeaveHub);

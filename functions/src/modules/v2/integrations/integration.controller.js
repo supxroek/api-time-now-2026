@@ -2,6 +2,18 @@ const catchAsync = require("../../../utils/catchAsync");
 const IntegrationService = require("./integration.service");
 
 class IntegrationController {
+  getLeaveHubRosterContext = catchAsync(async (req, res, _next) => {
+    const result = await IntegrationService.getLeaveHubRosterContext(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   getLeaveHubStatus = catchAsync(async (req, res, _next) => {
     const result = await IntegrationService.getLeaveHubStatus(
       req.user.company_id,

@@ -1,7 +1,7 @@
 const dayjs = require("dayjs");
 const AppError = require("../../../utils/AppError");
 const RosterV2Model = require("./roster.model");
-const LeaveHubIntegrationService = require("../../v1/leaveHubIntegration/leaveHubIntegration.service");
+const IntegrationV2Service = require("../integrations/integration.service");
 
 class RosterV2Service {
   resolveRange(query = {}) {
@@ -44,15 +44,12 @@ class RosterV2Service {
           endDate,
           employeeId,
         ),
-        LeaveHubIntegrationService.getRosterContext(
-          { company_id: companyId },
-          {
-            month,
-            start_date: startDate,
-            end_date: endDate,
-            employee_id: employeeId || undefined,
-          },
-        ).catch(() => ({
+        IntegrationV2Service.getLeaveHubRosterContext(companyId, {
+          month,
+          start_date: startDate,
+          end_date: endDate,
+          employee_id: employeeId || undefined,
+        }).catch(() => ({
           day_source: "local",
           connection_status: "not_connected",
           range: {

@@ -655,10 +655,16 @@ class IntegrationService {
     const holidayName = String(
       holidayRecord?.holiday_name || holidayRecord?.name || "",
     ).toLowerCase();
+    const holidayType = String(
+      holidayRecord?.holiday_type || holidayRecord?.type || "",
+    ).toLowerCase();
 
     if (
       holidayName.includes("ชดเชย") ||
       holidayName.includes("compens") ||
+      holidayType.includes("ชดเชย") ||
+      holidayType.includes("compens") ||
+      holidayType.includes("substitute") ||
       holidayRecord?.is_compensation === true ||
       holidayRecord?.is_compensation === 1
     ) {
@@ -1403,6 +1409,382 @@ class IntegrationService {
         throw new AppError(`กรุณาระบุ ${field}`, 400);
       }
     });
+  }
+
+  resolveRosterContextRange(query = {}) {
+    const isValidIsoDate = (value) =>
+      /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+
+    if (query?.start_date && !isValidIsoDate(query.start_date)) {
+      throw new AppError(
+        "วันที่ start_date ไม่ถูกต้อง ต้องเป็น YYYY-MM-DD",
+        400,
+      );
+    }
+
+    if (query?.end_date && !isValidIsoDate(query.end_date)) {
+      throw new AppError("วันที่ end_date ไม่ถูกต้อง ต้องเป็น YYYY-MM-DD", 400);
+    }
+
+    if (query?.month && !/^\d{4}-\d{2}$/.test(String(query.month))) {
+      throw new AppError("รูปแบบเดือนต้องเป็น YYYY-MM", 400);
+    }
+
+    if (query?.start_date && query?.end_date) {
+      return {
+        startDate: query.start_date,
+        endDate: query.end_date,
+      };
+    }
+
+    const month = query?.month || new Date().toISOString().slice(0, 7);
+    const [year, monthIndex] = String(month).split("-").map(Number);
+
+    const start = new Date(Date.UTC(year, monthIndex - 1, 1));
+    const end = new Date(Date.UTC(year, monthIndex, 0));
+
+    return {
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+    };
+  }
+
+  getRosterContextPriority(type) {
+    const priorityMap = {
+      LEAVE: 1,
+      HOLIDAY_SWAP: 2,
+      WEEKLY_HOLIDAY: 3,
+      HOLIDAY: 4,
+      HOLIDAY_COMPENSATION: 5,
+    };
+
+    return priorityMap[type] || 999;
+  }
+
+  setContextEventWithPriority(map, key, eventPayload) {
+    const current = map.get(key);
+    if (!current || eventPayload.priority <= current.priority) {
+      map.set(key, eventPayload);
+    }
+  }
+
+  async getLeaveHubRosterContext(companyId, query = {}) {
+    const normalizedCompanyId = Number(companyId);
+    const { startDate, endDate } = this.resolveRosterContextRange(query);
+
+    const integration =
+      await IntegrationModel.findLeaveHubIntegration(normalizedCompanyId);
+
+    if (integration?.status !== "active") {
+      return {
+        day_source: "local",
+        connection_status: "not_connected",
+        range: {
+          start_date: startDate,
+          end_date: endDate,
+        },
+        events_by_employee: [],
+        global_events: [],
+        mapped_employee_count: 0,
+        unmapped_staff_count: 0,
+      };
+    }
+
+    const credentials = this.getLeaveHubCredentialsFromIntegration(integration);
+    const loginResult = await this.loginToLeaveHub(
+      credentials.username,
+      credentials.password,
+    );
+
+    const resolvedLeavehubCompanyId =
+      Number(loginResult.leavehubCompanyId) || credentials.leavehubCompanyId;
+
+    const syncPayload = await this.fetchLeaveHubSyncData(
+      loginResult.token,
+      resolvedLeavehubCompanyId,
+    );
+
+    const employees =
+      await IntegrationModel.findEmployeesForLeaveHubMapping(
+        normalizedCompanyId,
+      );
+
+    const employeeByPassport = new Map();
+    employees.forEach((employee) => {
+      const passport = this.normalizePassportValue(
+        employee?.id_or_passport_number,
+      );
+      if (passport) {
+        employeeByPassport.set(passport, Number(employee.id));
+      }
+    });
+
+    const staffPassportById = this.buildStaffPassportMap(syncPayload.staffs);
+    const employeeRulesMap = this.buildEmployeeLeaveHubDayoffRules(
+      syncPayload.staffs,
+      syncPayload.custom_dayoffs,
+      employeeByPassport,
+      staffPassportById,
+    );
+
+    const targetEmployeeId = query?.employee_id
+      ? Number(query.employee_id)
+      : null;
+
+    const activeEmployeeIds = targetEmployeeId
+      ? new Set([targetEmployeeId])
+      : new Set(Array.from(employeeRulesMap.keys()));
+
+    const leaveTypeMap = this.resolveLeaveTypeMap(syncPayload.leave_types);
+    const eventsByEmployeeDate = new Map();
+    const globalEventsByDate = new Map();
+    const todayDate = new Date().toISOString().slice(0, 10);
+
+    (Array.isArray(syncPayload.leave_requests)
+      ? syncPayload.leave_requests
+      : []
+    ).forEach((leaveRequest) => {
+      if (!this.isApprovedStatus(leaveRequest?.status)) return;
+
+      const passport = this.getLeaveHubPassportFromRecord(
+        leaveRequest,
+        staffPassportById,
+      );
+      if (!passport || !employeeByPassport.has(passport)) return;
+
+      const employeeId = employeeByPassport.get(passport);
+      if (!activeEmployeeIds.has(employeeId)) return;
+
+      const start = this.getDateCandidateFromRecord(leaveRequest, [
+        "start_date",
+        "date",
+        "work_date",
+      ]);
+      const end =
+        this.getDateCandidateFromRecord(leaveRequest, ["end_date"]) || start;
+
+      if (!start || !end) return;
+
+      const leaveTypeName =
+        leaveTypeMap.get(String(leaveRequest?.leave_type_id)) ||
+        leaveRequest?.leave_type_name ||
+        null;
+
+      this.expandDateRange(start, end).forEach((workDate) => {
+        if (workDate < startDate || workDate > endDate) return;
+
+        this.setContextEventWithPriority(
+          eventsByEmployeeDate,
+          `${employeeId}|${workDate}`,
+          {
+            employee_id: employeeId,
+            work_date: workDate,
+            type: "LEAVE",
+            priority: this.getRosterContextPriority("LEAVE"),
+            details: {
+              leave_type_name: leaveTypeName,
+              status: leaveRequest?.status || null,
+              reason: leaveRequest?.reason || null,
+              start_date: leaveRequest?.start_date || null,
+              end_date: leaveRequest?.end_date || null,
+              days_requested: leaveRequest?.days_requested || null,
+              hours_requested: leaveRequest?.hours_requested || null,
+              start_time: leaveRequest?.start_time || null,
+              end_time: leaveRequest?.end_time || null,
+              leave_request_id: leaveRequest?.id || null,
+            },
+          },
+        );
+      });
+    });
+
+    (Array.isArray(syncPayload.swap_requests)
+      ? syncPayload.swap_requests
+      : []
+    ).forEach((swapRequest) => {
+      if (!this.isApprovedStatus(swapRequest?.status)) return;
+
+      const passport = this.getLeaveHubPassportFromRecord(
+        swapRequest,
+        staffPassportById,
+      );
+      if (!passport || !employeeByPassport.has(passport)) return;
+
+      const employeeId = employeeByPassport.get(passport);
+      if (!activeEmployeeIds.has(employeeId)) return;
+
+      const workDate = this.getDateCandidateFromRecord(swapRequest, [
+        "new_date",
+        "date",
+        "work_date",
+      ]);
+      if (!workDate || workDate < startDate || workDate > endDate) return;
+
+      this.setContextEventWithPriority(
+        eventsByEmployeeDate,
+        `${employeeId}|${workDate}`,
+        {
+          employee_id: employeeId,
+          work_date: workDate,
+          type: "HOLIDAY_SWAP",
+          priority: this.getRosterContextPriority("HOLIDAY_SWAP"),
+          details: {
+            holiday_name: swapRequest?.holiday_name || null,
+            postpone_name: swapRequest?.postpone_name || null,
+            original_date: swapRequest?.original_date || null,
+            new_date: swapRequest?.new_date || null,
+            status: swapRequest?.status || null,
+            reason: swapRequest?.reason || null,
+            swap_request_id: swapRequest?.id || null,
+          },
+        },
+      );
+    });
+
+    const allDatesInRange = this.expandDateRange(startDate, endDate);
+    Array.from(activeEmployeeIds).forEach((employeeId) => {
+      const employeeRules = employeeRulesMap.get(Number(employeeId));
+      if (!employeeRules) return;
+
+      allDatesInRange.forEach((workDate) => {
+        if (!this.isEmployeeWeeklyOffOnDate(employeeRules, workDate)) return;
+
+        const isNormalWeeklyRule = Number(employeeRules.dayOffStatus) !== 1;
+        if (isNormalWeeklyRule && workDate < todayDate) return;
+
+        this.setContextEventWithPriority(
+          eventsByEmployeeDate,
+          `${employeeId}|${workDate}`,
+          {
+            employee_id: Number(employeeId),
+            work_date: workDate,
+            type: "WEEKLY_HOLIDAY",
+            priority: this.getRosterContextPriority("WEEKLY_HOLIDAY"),
+            details: {
+              source:
+                Number(employeeRules.dayOffStatus) === 1
+                  ? "custom_dayoff"
+                  : "staff_dayoff",
+            },
+          },
+        );
+      });
+    });
+
+    const resolvedHolidayDates = new Set();
+    const publicHolidayRefs = [];
+
+    (Array.isArray(syncPayload.holidays) ? syncPayload.holidays : []).forEach(
+      (holiday) => {
+        const holidayDates = this.resolveHolidayWorkDates(holiday);
+        if (!holidayDates.length) return;
+
+        const isCompensatory =
+          this.mapHolidayToDayType(holiday) === "compensated_holiday";
+        const eventType = isCompensatory ? "HOLIDAY_COMPENSATION" : "HOLIDAY";
+
+        holidayDates.forEach((workDate) => {
+          if (workDate < startDate || workDate > endDate) return;
+
+          resolvedHolidayDates.add(workDate);
+          if (!isCompensatory) {
+            publicHolidayRefs.push({
+              work_date: workDate,
+              holiday_name: holiday?.holiday_name || holiday?.name || null,
+              holiday_id: holiday?.id || null,
+            });
+          }
+
+          this.setContextEventWithPriority(globalEventsByDate, workDate, {
+            work_date: workDate,
+            type: eventType,
+            priority: this.getRosterContextPriority(eventType),
+            details: {
+              holiday_name: holiday?.holiday_name || holiday?.name || null,
+              holiday_date: workDate,
+              holiday_id: holiday?.id || null,
+              source: "holidays",
+              ...(isCompensatory
+                ? {
+                    compensation_from_date:
+                      holiday?.compensation_from_date || null,
+                  }
+                : {}),
+            },
+          });
+        });
+      },
+    );
+
+    Array.from(activeEmployeeIds).forEach((employeeId) => {
+      const employeeRules = employeeRulesMap.get(Number(employeeId));
+      if (!employeeRules) return;
+
+      const blockedHolidayDates = new Set(resolvedHolidayDates);
+
+      publicHolidayRefs.forEach((holidayRef) => {
+        if (
+          !this.isEmployeeWeeklyOffOnDate(employeeRules, holidayRef.work_date)
+        ) {
+          return;
+        }
+
+        const nextCompensatedDate = this.findNextAvailableWorkday(
+          this.addDays(holidayRef.work_date, 1),
+          employeeRules,
+          blockedHolidayDates,
+        );
+
+        if (
+          !nextCompensatedDate ||
+          nextCompensatedDate < startDate ||
+          nextCompensatedDate > endDate
+        ) {
+          return;
+        }
+
+        this.setContextEventWithPriority(
+          eventsByEmployeeDate,
+          `${employeeId}|${nextCompensatedDate}`,
+          {
+            employee_id: Number(employeeId),
+            work_date: nextCompensatedDate,
+            type: "HOLIDAY_COMPENSATION",
+            priority: this.getRosterContextPriority("HOLIDAY_COMPENSATION"),
+            details: {
+              source: "generated_compensation",
+              holiday_name: holidayRef.holiday_name,
+              holiday_id: holidayRef.holiday_id,
+              original_date: holidayRef.work_date,
+              compensation_from_date: holidayRef.work_date,
+            },
+          },
+        );
+
+        blockedHolidayDates.add(nextCompensatedDate);
+      });
+    });
+
+    const totalStaffs = Array.isArray(syncPayload?.staffs)
+      ? syncPayload.staffs.length
+      : 0;
+
+    return {
+      day_source: "leave_hub",
+      connection_status: "connected",
+      range: {
+        start_date: startDate,
+        end_date: endDate,
+      },
+      events_by_employee: Array.from(eventsByEmployeeDate.values()).map(
+        ({ priority, ...rest }) => rest,
+      ),
+      global_events: Array.from(globalEventsByDate.values()).map(
+        ({ priority, ...rest }) => rest,
+      ),
+      mapped_employee_count: activeEmployeeIds.size,
+      unmapped_staff_count: Math.max(0, totalStaffs - employeeByPassport.size),
+    };
   }
 
   async getLeaveHubStatus(companyId) {
