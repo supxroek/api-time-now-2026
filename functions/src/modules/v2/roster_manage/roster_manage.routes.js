@@ -14,4 +14,16 @@ router
   .route("/bulk-save")
   .post(restrictTo("super_admin", "admin"), controller.bulkSave);
 
+router
+  .route("/bulk-upsert")
+  .post(restrictTo("super_admin", "admin"), controller.bulkUpsert);
+
+router
+  .route("/bulk-upsert-daytype")
+  .post(restrictTo("super_admin", "admin"), controller.bulkUpsertDayType);
+
+router
+  .route("/bulk-upsert-shift")
+  .post(restrictTo("super_admin", "admin"), controller.bulkUpsertShift);
+
 module.exports = router;

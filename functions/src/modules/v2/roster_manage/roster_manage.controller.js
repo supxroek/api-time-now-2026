@@ -28,6 +28,51 @@ class RosterManageV2Controller {
       data: result,
     });
   });
+
+  bulkUpsert = catchAsync(async (req, res, _next) => {
+    const result = await RosterManageV2Service.bulkUpsert(
+      req.user.company_id,
+      req.user,
+      req.body,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "บันทึกข้อมูล Unified Roster สำเร็จ",
+      data: result,
+    });
+  });
+
+  bulkUpsertDayType = catchAsync(async (req, res, _next) => {
+    const result = await RosterManageV2Service.bulkUpsertDayType(
+      req.user.company_id,
+      req.user,
+      req.body,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "บันทึกวันหยุดประจำสัปดาห์สำเร็จ",
+      data: result,
+    });
+  });
+
+  bulkUpsertShift = catchAsync(async (req, res, _next) => {
+    const result = await RosterManageV2Service.bulkUpsertShift(
+      req.user.company_id,
+      req.user,
+      req.body,
+      req.ip,
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "บันทึกจัดเวรรายวันสำเร็จ",
+      data: result,
+    });
+  });
 }
 
 module.exports = new RosterManageV2Controller();
