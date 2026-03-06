@@ -6,6 +6,7 @@ const RosterManageV2Model = require("./roster_manage.model");
 
 const MODE_TYPES = new Set(["off_days", "shifts"]);
 const MUTABLE_DAY_TYPES = new Set(["workday", "weekly_off"]);
+const OFFDAY_DELETE_TOKEN = "__offday_delete__";
 
 class RosterManageV2Service {
   resolveModeType(modeType = "off_days") {
@@ -40,6 +41,10 @@ class RosterManageV2Service {
     return this.isValidIsoDate(date) && dayjs(date).format("YYYY-MM") === month;
   }
 
+  isPastDate(date) {
+    return dayjs(date).isBefore(dayjs(), "day");
+  }
+
   validateRosterPayload(rosterData) {
     if (
       !rosterData ||
@@ -65,24 +70,33 @@ class RosterManageV2Service {
       department_id: query.department_id ? Number(query.department_id) : null,
     };
 
-    const [employees, departments, shifts, rosters, dayoffCustomDays] =
-      await Promise.all([
-        RosterManageV2Model.findEmployeesForMode(companyId, modeType, filters),
-        RosterManageV2Model.findDepartments(companyId),
-        RosterManageV2Model.findShifts(companyId),
-        RosterManageV2Model.findRostersByDateRange(
-          companyId,
-          startDate,
-          endDate,
-          modeType,
-        ),
-        RosterManageV2Model.findDayoffCustomDaysByDateRange(
-          companyId,
-          startDate,
-          endDate,
-          modeType,
-        ),
-      ]);
+    const [
+      employees,
+      departments,
+      shifts,
+      rosters,
+      dayoffCustomDays,
+      leavehubStatus,
+    ] = await Promise.all([
+      RosterManageV2Model.findEmployeesForMode(companyId, modeType, filters),
+      RosterManageV2Model.findDepartments(companyId),
+      RosterManageV2Model.findShifts(companyId),
+      RosterManageV2Model.findRostersByDateRange(
+        companyId,
+        startDate,
+        endDate,
+        modeType,
+      ),
+      RosterManageV2Model.findDayoffCustomDaysByDateRange(
+        companyId,
+        startDate,
+        endDate,
+        modeType,
+      ),
+      RosterManageV2Model.findLeavehubIntegrationStatus(companyId),
+    ]);
+
+    const isLeavehubConnected = leavehubStatus?.status === "active";
 
     return {
       employees,
@@ -90,6 +104,14 @@ class RosterManageV2Service {
       shifts,
       rosters,
       dayoff_custom_days: dayoffCustomDays,
+      leavehub_context: {
+        connection_status: isLeavehubConnected ? "connected" : "disconnected",
+        day_source: isLeavehubConnected ? "leave_hub" : "time_now",
+        sync_status: leavehubStatus?.sync_status || null,
+        last_sync_at: leavehubStatus?.last_sync_at || null,
+        events_by_employee: [],
+        global_events: [],
+      },
       meta: {
         month,
         start_date: startDate,
@@ -492,7 +514,53 @@ class RosterManageV2Service {
   }
 
   isDateEligibleForBulk(date, month) {
-    return this.isValidIsoDate(date) && this.isDateInMonth(date, month);
+    return (
+      this.isValidIsoDate(date) &&
+      this.isDateInMonth(date, month) &&
+      !this.isPastDate(date)
+    );
+  }
+
+  normalizeBulkCellValue(modeType, rawValue) {
+    // Guard clause: ถ้าไม่ใช่ object ที่คาดหวัง ให้ return rawValue
+    if (!this.isValidObject(rawValue)) {
+      return rawValue;
+    }
+
+    // Handle โดย priority mapping
+    return this.handleObjectValue(rawValue, modeType);
+  }
+
+  isValidObject(rawValue) {
+    return (
+      rawValue !== null &&
+      typeof rawValue === "object" &&
+      !Array.isArray(rawValue)
+    );
+  }
+
+  handleObjectValue(rawValue, modeType) {
+    const action = String(rawValue.action || "").toLowerCase();
+
+    // Priority 1: action = delete
+    if (action === "delete") {
+      return modeType === "off_days" ? OFFDAY_DELETE_TOKEN : 0;
+    }
+
+    // Priority 2-4: ใช้ mapping table แทน if chain
+    const handlers = {
+      value: () => rawValue.value,
+      shift_id: () => rawValue.shift_id,
+      off_day: () => (rawValue.off_day ? null : OFFDAY_DELETE_TOKEN),
+    };
+
+    for (const [key, handler] of Object.entries(handlers)) {
+      if (Object.hasOwn(rawValue, key)) {
+        return handler();
+      }
+    }
+
+    return null;
   }
 
   async processBulkCell({
@@ -508,13 +576,15 @@ class RosterManageV2Service {
     audits,
     shiftCache,
   }) {
+    const normalizedValue = this.normalizeBulkCellValue(modeType, value);
+
     if (modeType === "off_days") {
       await this.handleOffDayUpdate({
         companyId,
         user,
         employeeId,
         date,
-        value,
+        value: normalizedValue,
         connection,
         counters,
         skipped,
@@ -528,7 +598,7 @@ class RosterManageV2Service {
       user,
       employeeId,
       date,
-      shiftId: value,
+      shiftId: normalizedValue,
       connection,
       counters,
       skipped,
@@ -577,6 +647,11 @@ class RosterManageV2Service {
         existingRoster,
         existingCustomDay,
       });
+      return;
+    }
+
+    if (value !== OFFDAY_DELETE_TOKEN && value !== undefined) {
+      this.pushSkipped(skipped, employeeId, date, "invalid_offday_payload");
       return;
     }
 
@@ -665,6 +740,14 @@ class RosterManageV2Service {
     const audits = [];
     const shiftCache = new Set();
 
+    const leavehubStatus =
+      await RosterManageV2Model.findLeavehubIntegrationStatus(companyId);
+    const isLeavehubConnected = leavehubStatus?.status === "active";
+
+    if (modeType === "off_days" && isLeavehubConnected) {
+      throw new AppError("โหมดกำหนดวันหยุดถูกล็อกเมื่อเชื่อมต่อ Leavehub", 409);
+    }
+
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -683,6 +766,13 @@ class RosterManageV2Service {
         );
 
         const dateMap = payload.roster_data[employeeIdStr] || {};
+        const rawDates = Object.keys(dateMap || {});
+        rawDates.forEach((date) => {
+          if (this.isValidIsoDate(date) && this.isPastDate(date)) {
+            this.pushSkipped(skipped, employeeId, date, "past_date_read_only");
+          }
+        });
+
         await this.processEmployeeDateMap({
           companyId,
           user,

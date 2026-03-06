@@ -82,6 +82,27 @@ class RosterManageV2Model {
     return rows;
   }
 
+  async findLeavehubIntegrationStatus(companyId, executor) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			SELECT
+				integration_type,
+				status,
+				activated_at,
+				deactivated_at,
+				last_sync_at,
+				sync_status,
+				sync_error_message
+			FROM company_integrations
+			WHERE company_id = ?
+				AND integration_type = 'leavehub'
+			LIMIT 1
+		`;
+
+    const [rows] = await exec.query(query, [companyId]);
+    return rows[0] || null;
+  }
+
   async findRostersByDateRange(companyId, startDate, endDate, modeType) {
     const byOffDays = modeType === "off_days";
 
