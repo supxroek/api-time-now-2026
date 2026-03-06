@@ -2,7 +2,7 @@ const catchAsync = require("../../../utils/catchAsync");
 const RosterManageV2Service = require("./roster_manage.service");
 
 class RosterManageV2Controller {
-  getOverview = catchAsync(async (req, res, _next) => {
+  getOverview = catchAsync(async (req, res) => {
     const result = await RosterManageV2Service.getOverview(
       req.user.company_id,
       req.query,
@@ -14,7 +14,7 @@ class RosterManageV2Controller {
     });
   });
 
-  bulkSave = catchAsync(async (req, res, _next) => {
+  bulkSave = catchAsync(async (req, res) => {
     const result = await RosterManageV2Service.bulkSave(
       req.user.company_id,
       req.user,
@@ -24,52 +24,7 @@ class RosterManageV2Controller {
 
     res.status(200).json({
       status: "success",
-      message: "บันทึกตารางเวรสำเร็จ",
-      data: result,
-    });
-  });
-
-  bulkUpsert = catchAsync(async (req, res, _next) => {
-    const result = await RosterManageV2Service.bulkUpsert(
-      req.user.company_id,
-      req.user,
-      req.body,
-      req.ip,
-    );
-
-    res.status(200).json({
-      status: "success",
-      message: "บันทึกข้อมูล Unified Roster สำเร็จ",
-      data: result,
-    });
-  });
-
-  bulkUpsertDayType = catchAsync(async (req, res, _next) => {
-    const result = await RosterManageV2Service.bulkUpsertDayType(
-      req.user.company_id,
-      req.user,
-      req.body,
-      req.ip,
-    );
-
-    res.status(200).json({
-      status: "success",
-      message: "บันทึกวันหยุดประจำสัปดาห์สำเร็จ",
-      data: result,
-    });
-  });
-
-  bulkUpsertShift = catchAsync(async (req, res, _next) => {
-    const result = await RosterManageV2Service.bulkUpsertShift(
-      req.user.company_id,
-      req.user,
-      req.body,
-      req.ip,
-    );
-
-    res.status(200).json({
-      status: "success",
-      message: "บันทึกจัดเวรรายวันสำเร็จ",
+      message: "บันทึกข้อมูล roster-manage สำเร็จ",
       data: result,
     });
   });

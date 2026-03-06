@@ -1,16 +1,19 @@
 const dayjs = require("dayjs");
+const db = require("../../../config/db.config");
 const AppError = require("../../../utils/AppError");
 const auditRecord = require("../../../utils/audit.record");
-const db = require("../../../config/db.config");
 const RosterManageV2Model = require("./roster_manage.model");
-const IntegrationV2Service = require("../integrations/integration.service");
+
+const MODE_TYPES = new Set(["off_days", "shifts"]);
+const MUTABLE_DAY_TYPES = new Set(["workday", "weekly_off"]);
 
 class RosterManageV2Service {
-  normalizeWorkspaceMode(value) {
-    const normalized = String(value || "").toLowerCase();
-    if (normalized === "holiday") return "holiday";
-    if (normalized === "shift") return "shift";
-    return "unified";
+  resolveModeType(modeType = "off_days") {
+    const normalized = String(modeType || "off_days");
+    if (!MODE_TYPES.has(normalized)) {
+      throw new AppError("mode_type ต้องเป็น off_days หรือ shifts", 400);
+    }
+    return normalized;
   }
 
   resolveDateRange(query = {}) {
@@ -30,443 +33,694 @@ class RosterManageV2Service {
   }
 
   isValidIsoDate(value) {
-    return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value)) && dayjs(value).isValid();
   }
 
-  isReadOnlyBySystem(existingRoster) {
-    const dayType = String(existingRoster?.day_type || "").toLowerCase();
-    const isLeave = dayType.endsWith("_leave");
-    const isHoliday = [
-      "public_holiday",
-      "compensated_holiday",
-      "holiday_swap",
-    ].includes(dayType);
-
-    return existingRoster?.source_system === "leavehub" || isLeave || isHoliday;
+  isDateInMonth(date, month) {
+    return this.isValidIsoDate(date) && dayjs(date).format("YYYY-MM") === month;
   }
 
-  isPastDate(workDate) {
-    return dayjs(workDate).isBefore(dayjs().startOf("day"), "day");
+  validateRosterPayload(rosterData) {
+    if (
+      !rosterData ||
+      typeof rosterData !== "object" ||
+      Array.isArray(rosterData)
+    ) {
+      throw new AppError("กรุณาระบุ roster_data ให้ถูกต้อง", 400);
+    }
   }
 
-  isTodayDate(workDate) {
-    return dayjs(workDate).isSame(dayjs(), "day");
+  isRosterLocked(rosterRow) {
+    if (!rosterRow) return false;
+    if (rosterRow.source_system === "leavehub") return true;
+    return !MUTABLE_DAY_TYPES.has(rosterRow.day_type);
   }
 
-  normalizeCellAction(rawValue) {
-    if (rawValue === undefined) {
-      return { type: "NONE" };
-    }
-
-    if (rawValue === null) {
-      return { type: "WEEKLY_OFF" };
-    }
-
-    if (typeof rawValue === "number") {
-      if (rawValue === 0) return { type: "EMPTY" };
-      return { type: "SHIFT", shiftId: rawValue };
-    }
-
-    if (typeof rawValue === "string") {
-      if (rawValue === "") return { type: "EMPTY" };
-      const parsed = Number(rawValue);
-      if (!Number.isNaN(parsed)) {
-        if (parsed === 0) return { type: "EMPTY" };
-        return { type: "SHIFT", shiftId: parsed };
-      }
-      return { type: "NONE" };
-    }
-
-    if (typeof rawValue === "object") {
-      const kind = String(rawValue.kind || rawValue.type || "").toUpperCase();
-      if (kind === "EMPTY") return { type: "EMPTY" };
-      if (kind === "WEEKLY_OFF") return { type: "WEEKLY_OFF" };
-      if (kind === "SHIFT") {
-        return { type: "SHIFT", shiftId: Number(rawValue.shift_id) };
-      }
-    }
-
-    return { type: "NONE" };
-  }
-
-  async getOverview(companyId, query) {
+  async getOverview(companyId, query = {}) {
+    const modeType = this.resolveModeType(query.mode_type);
     const { month, startDate, endDate } = this.resolveDateRange(query);
-    const workspaceMode = this.normalizeWorkspaceMode(query?.mode || "unified");
+
     const filters = {
-      search: query?.search || undefined,
-      department_id: query?.department_id ? Number(query.department_id) : null,
+      search: query.search?.trim() || "",
+      department_id: query.department_id ? Number(query.department_id) : null,
     };
 
-    const [
-      employees,
-      departments,
-      shifts,
-      rosters,
-      attendanceFlags,
-      leaveHubStatus,
-      leavehubContext,
-    ] = await Promise.all([
-      RosterManageV2Model.findEmployeesForWorkspace(companyId, filters),
-      RosterManageV2Model.findDepartments(companyId),
-      RosterManageV2Model.findShifts(companyId),
-      RosterManageV2Model.findRostersByDateRange(companyId, startDate, endDate),
-      RosterManageV2Model.findAttendanceFlagsByDateRange(
-        companyId,
-        startDate,
-        endDate,
-      ),
-      IntegrationV2Service.getLeaveHubStatus(companyId).catch(() => ({
-        connected: false,
-        integration: null,
-      })),
-      IntegrationV2Service.getLeaveHubRosterContext(companyId, {
-        month,
-        start_date: startDate,
-        end_date: endDate,
-      }).catch(() => ({
-        day_source: "local",
-        connection_status: "not_connected",
-        range: {
-          start_date: startDate,
-          end_date: endDate,
-        },
-        events_by_employee: [],
-        global_events: [],
-        mapped_employee_count: 0,
-        unmapped_staff_count: 0,
-      })),
-    ]);
+    const [employees, departments, shifts, rosters, dayoffCustomDays] =
+      await Promise.all([
+        RosterManageV2Model.findEmployeesForMode(companyId, modeType, filters),
+        RosterManageV2Model.findDepartments(companyId),
+        RosterManageV2Model.findShifts(companyId),
+        RosterManageV2Model.findRostersByDateRange(
+          companyId,
+          startDate,
+          endDate,
+          modeType,
+        ),
+        RosterManageV2Model.findDayoffCustomDaysByDateRange(
+          companyId,
+          startDate,
+          endDate,
+          modeType,
+        ),
+      ]);
 
     return {
       employees,
       departments,
       shifts,
       rosters,
-      attendance_flags: attendanceFlags,
-      leavehub_status: leaveHubStatus,
-      leavehub_context: leavehubContext,
+      dayoff_custom_days: dayoffCustomDays,
       meta: {
         month,
         start_date: startDate,
         end_date: endDate,
-        workspace_mode: workspaceMode,
+        mode_type: modeType,
       },
     };
   }
 
-  async bulkUpsert(companyId, user, payload, ipAddress, options = {}) {
-    const workspaceMode = this.normalizeWorkspaceMode(
-      options?.mode || "unified",
+  async ensureEmployeeAllowed(companyId, employeeId, modeType, executor) {
+    const employee = await RosterManageV2Model.findEmployeeByIdAndMode(
+      companyId,
+      Number(employeeId),
+      modeType,
+      executor,
     );
-    const rosterData = payload?.roster_data;
-    if (!rosterData || typeof rosterData !== "object") {
-      throw new AppError("กรุณาระบุ roster_data ให้ถูกต้อง", 400);
+
+    if (!employee) {
+      throw new AppError(
+        `พนักงาน ID ${employeeId} ไม่อยู่ในรายการที่อนุญาตสำหรับโหมดนี้`,
+        400,
+      );
     }
 
-    const employeeIds = Object.keys(rosterData)
-      .map(Number)
-      .filter((value) => Number.isInteger(value) && value > 0);
+    return employee;
+  }
 
-    const employeeCache = new Map();
-    const shiftCache = new Set();
-    const summary = {
-      created: 0,
-      updated: 0,
-      deleted: 0,
-      skipped_readonly: 0,
-      skipped_invalid: 0,
-      skipped_past_locked: 0,
-      warning_today_with_logs: 0,
-      touched_employees: new Set(),
-      affected_dates: new Set(),
-    };
+  async ensureShiftAllowed(companyId, shiftId, shiftCache, executor) {
+    const numericShiftId = Number(shiftId);
+    if (!Number.isInteger(numericShiftId) || numericShiftId <= 0) {
+      throw new AppError(`shift_id ${shiftId} ไม่ถูกต้อง`, 400);
+    }
 
-    const todayWithLogs = new Set();
-    if (workspaceMode === "shift") {
-      const today = dayjs().format("YYYY-MM-DD");
-      const attendanceToday =
-        await RosterManageV2Model.findAttendanceFlagsByDateRange(
-          companyId,
-          today,
-          today,
-          employeeIds,
-        );
+    if (shiftCache.has(numericShiftId)) return;
 
-      attendanceToday.forEach((row) => {
-        if (row?.first_check_in) {
-          todayWithLogs.add(`${row.employee_id}|${today}`);
-        }
+    const shift = await RosterManageV2Model.findShiftById(
+      companyId,
+      numericShiftId,
+      executor,
+    );
+    if (!shift) {
+      throw new AppError(`ไม่พบกะการทำงาน ID ${numericShiftId}`, 400);
+    }
+
+    shiftCache.add(numericShiftId);
+  }
+
+  pushSkipped(skipped, employeeId, date, reason) {
+    skipped.push({
+      employee_id: Number(employeeId),
+      work_date: date,
+      reason,
+    });
+  }
+
+  canSetOffDay(existingRoster) {
+    if (this.isRosterLocked(existingRoster)) return false;
+    const hasWorkShift =
+      existingRoster?.day_type === "workday" &&
+      existingRoster?.shift_id !== null &&
+      Number(existingRoster?.shift_id) > 0;
+    return !hasWorkShift;
+  }
+
+  isLocalWeeklyOff(existingRoster) {
+    return (
+      existingRoster?.source_system === "local" &&
+      existingRoster?.day_type === "weekly_off"
+    );
+  }
+
+  isLocalWorkday(existingRoster) {
+    return (
+      existingRoster?.source_system === "local" &&
+      existingRoster?.day_type === "workday"
+    );
+  }
+
+  async applyOffDaySet({
+    companyId,
+    user,
+    employeeId,
+    date,
+    connection,
+    counters,
+    skipped,
+    audits,
+    existingRoster,
+    existingCustomDay,
+  }) {
+    if (!this.canSetOffDay(existingRoster)) {
+      const reason = this.isRosterLocked(existingRoster)
+        ? "locked_by_source_or_day_type"
+        : "shift_already_assigned";
+      this.pushSkipped(skipped, employeeId, date, reason);
+      return;
+    }
+
+    await RosterManageV2Model.upsertDayoffCustomDay(
+      companyId,
+      employeeId,
+      date,
+      user.id,
+      connection,
+    );
+
+    await RosterManageV2Model.upsertWeeklyOffRoster(
+      companyId,
+      employeeId,
+      date,
+      connection,
+    );
+
+    if (existingCustomDay) {
+      counters.updated += 1;
+    } else {
+      counters.created += 1;
+      audits.push({
+        userId: user.id,
+        companyId,
+        action: "INSERT",
+        table: "employee_dayoff_custom_days",
+        recordId: 0,
+        oldVal: null,
+        newVal: {
+          company_id: companyId,
+          employee_id: Number(employeeId),
+          off_date: date,
+        },
       });
     }
 
-    const connection = await db.getConnection();
+    if (existingRoster) {
+      counters.updated += 1;
+      audits.push({
+        userId: user.id,
+        companyId,
+        action: "UPDATE",
+        table: "rosters",
+        recordId: existingRoster.id,
+        oldVal: existingRoster,
+        newVal: {
+          ...existingRoster,
+          shift_id: null,
+          day_type: "weekly_off",
+          source_system: "local",
+        },
+      });
+      return;
+    }
 
+    counters.created += 1;
+    audits.push({
+      userId: user.id,
+      companyId,
+      action: "INSERT",
+      table: "rosters",
+      recordId: 0,
+      oldVal: null,
+      newVal: {
+        company_id: companyId,
+        employee_id: Number(employeeId),
+        work_date: date,
+        shift_id: null,
+        day_type: "weekly_off",
+        source_system: "local",
+      },
+    });
+  }
+
+  async applyOffDayUnset({
+    companyId,
+    user,
+    employeeId,
+    connection,
+    counters,
+    audits,
+    existingRoster,
+    existingCustomDay,
+    skipped,
+    date,
+  }) {
+    if (this.isRosterLocked(existingRoster)) {
+      this.pushSkipped(
+        skipped,
+        employeeId,
+        date,
+        "locked_by_source_or_day_type",
+      );
+      return;
+    }
+
+    if (existingCustomDay) {
+      const customDayId = existingCustomDay?.id;
+      const affected = await RosterManageV2Model.deleteDayoffCustomDayById(
+        customDayId,
+        companyId,
+        connection,
+      );
+      if (affected > 0) {
+        counters.deleted += 1;
+        audits.push({
+          userId: user.id,
+          companyId,
+          action: "DELETE",
+          table: "employee_dayoff_custom_days",
+          recordId: customDayId,
+          oldVal: existingCustomDay,
+          newVal: null,
+        });
+      }
+    }
+
+    if (this.isLocalWeeklyOff(existingRoster)) {
+      const rosterId = existingRoster?.id;
+      const affected = await RosterManageV2Model.deleteRosterById(
+        rosterId,
+        companyId,
+        connection,
+      );
+      if (affected > 0) {
+        counters.deleted += 1;
+        audits.push({
+          userId: user.id,
+          companyId,
+          action: "DELETE",
+          table: "rosters",
+          recordId: rosterId,
+          oldVal: existingRoster,
+          newVal: null,
+        });
+      }
+    }
+  }
+
+  async clearShiftIfPossible({
+    companyId,
+    user,
+    employeeId,
+    date,
+    connection,
+    counters,
+    skipped,
+    audits,
+    existingRoster,
+  }) {
+    if (this.isRosterLocked(existingRoster)) {
+      this.pushSkipped(
+        skipped,
+        employeeId,
+        date,
+        "locked_by_source_or_day_type",
+      );
+      return;
+    }
+
+    if (!this.isLocalWorkday(existingRoster)) {
+      return;
+    }
+
+    const rosterId = existingRoster?.id;
+    const affected = await RosterManageV2Model.deleteRosterById(
+      rosterId,
+      companyId,
+      connection,
+    );
+
+    if (affected <= 0) {
+      return;
+    }
+
+    counters.deleted += 1;
+    audits.push({
+      userId: user.id,
+      companyId,
+      action: "DELETE",
+      table: "rosters",
+      recordId: rosterId,
+      oldVal: existingRoster,
+      newVal: null,
+    });
+  }
+
+  async assignShiftIfPossible({
+    companyId,
+    user,
+    employeeId,
+    date,
+    shiftId,
+    connection,
+    counters,
+    skipped,
+    shiftCache,
+    audits,
+    existingRoster,
+    existingCustomDay,
+  }) {
+    if (shiftId === null) {
+      this.pushSkipped(skipped, employeeId, date, "invalid_shift_value");
+      return;
+    }
+
+    if (existingCustomDay) {
+      this.pushSkipped(skipped, employeeId, date, "dayoff_custom_day_exists");
+      return;
+    }
+
+    if (this.isRosterLocked(existingRoster)) {
+      this.pushSkipped(
+        skipped,
+        employeeId,
+        date,
+        "locked_by_source_or_day_type",
+      );
+      return;
+    }
+
+    await this.ensureShiftAllowed(companyId, shiftId, shiftCache, connection);
+
+    const numericShiftId = Number(shiftId);
+    await RosterManageV2Model.upsertWorkdayRoster(
+      companyId,
+      employeeId,
+      date,
+      numericShiftId,
+      connection,
+    );
+
+    if (existingRoster) {
+      counters.updated += 1;
+      audits.push({
+        userId: user.id,
+        companyId,
+        action: "UPDATE",
+        table: "rosters",
+        recordId: existingRoster.id,
+        oldVal: existingRoster,
+        newVal: {
+          ...existingRoster,
+          shift_id: numericShiftId,
+          day_type: "workday",
+          source_system: "local",
+        },
+      });
+      return;
+    }
+
+    counters.created += 1;
+    audits.push({
+      userId: user.id,
+      companyId,
+      action: "INSERT",
+      table: "rosters",
+      recordId: 0,
+      oldVal: null,
+      newVal: {
+        company_id: companyId,
+        employee_id: Number(employeeId),
+        work_date: date,
+        shift_id: numericShiftId,
+        day_type: "workday",
+        source_system: "local",
+      },
+    });
+  }
+
+  async processEmployeeDateMap({
+    companyId,
+    user,
+    employeeId,
+    dateMap,
+    month,
+    modeType,
+    connection,
+    counters,
+    skipped,
+    audits,
+    shiftCache,
+  }) {
+    const dates = Object.keys(dateMap || {}).sort((a, b) => a.localeCompare(b));
+
+    for (const date of dates) {
+      if (!this.isDateEligibleForBulk(date, month)) continue;
+
+      const value = dateMap[date];
+      await this.processBulkCell({
+        modeType,
+        companyId,
+        user,
+        employeeId,
+        date,
+        value,
+        connection,
+        counters,
+        skipped,
+        audits,
+        shiftCache,
+      });
+    }
+  }
+
+  isDateEligibleForBulk(date, month) {
+    return this.isValidIsoDate(date) && this.isDateInMonth(date, month);
+  }
+
+  async processBulkCell({
+    modeType,
+    companyId,
+    user,
+    employeeId,
+    date,
+    value,
+    connection,
+    counters,
+    skipped,
+    audits,
+    shiftCache,
+  }) {
+    if (modeType === "off_days") {
+      await this.handleOffDayUpdate({
+        companyId,
+        user,
+        employeeId,
+        date,
+        value,
+        connection,
+        counters,
+        skipped,
+        audits,
+      });
+      return;
+    }
+
+    await this.handleShiftUpdate({
+      companyId,
+      user,
+      employeeId,
+      date,
+      shiftId: value,
+      connection,
+      counters,
+      skipped,
+      shiftCache,
+      audits,
+    });
+  }
+
+  async handleOffDayUpdate({
+    companyId,
+    user,
+    employeeId,
+    date,
+    value,
+    connection,
+    counters,
+    skipped,
+    audits,
+  }) {
+    const existingRoster =
+      await RosterManageV2Model.findRosterByEmployeeAndDate(
+        companyId,
+        employeeId,
+        date,
+        connection,
+      );
+
+    const existingCustomDay =
+      await RosterManageV2Model.findDayoffCustomDayByEmployeeAndDate(
+        companyId,
+        employeeId,
+        date,
+        connection,
+      );
+
+    if (value === null) {
+      await this.applyOffDaySet({
+        companyId,
+        user,
+        employeeId,
+        date,
+        connection,
+        counters,
+        skipped,
+        audits,
+        existingRoster,
+        existingCustomDay,
+      });
+      return;
+    }
+
+    await this.applyOffDayUnset({
+      companyId,
+      user,
+      employeeId,
+      connection,
+      counters,
+      audits,
+      existingRoster,
+      existingCustomDay,
+      skipped,
+      date,
+    });
+  }
+
+  async handleShiftUpdate({
+    companyId,
+    user,
+    employeeId,
+    date,
+    shiftId,
+    connection,
+    counters,
+    skipped,
+    shiftCache,
+    audits,
+  }) {
+    const existingRoster =
+      await RosterManageV2Model.findRosterByEmployeeAndDate(
+        companyId,
+        employeeId,
+        date,
+        connection,
+      );
+
+    const existingCustomDay =
+      await RosterManageV2Model.findDayoffCustomDayByEmployeeAndDate(
+        companyId,
+        employeeId,
+        date,
+        connection,
+      );
+
+    const isClearShift = shiftId === 0 || shiftId === "0" || shiftId === "";
+
+    if (isClearShift) {
+      await this.clearShiftIfPossible({
+        companyId,
+        user,
+        employeeId,
+        date,
+        connection,
+        counters,
+        skipped,
+        audits,
+        existingRoster,
+      });
+      return;
+    }
+
+    await this.assignShiftIfPossible({
+      companyId,
+      user,
+      employeeId,
+      date,
+      shiftId,
+      connection,
+      counters,
+      skipped,
+      shiftCache,
+      audits,
+      existingRoster,
+      existingCustomDay,
+    });
+  }
+
+  async bulkSave(companyId, user, payload, ipAddress) {
+    const modeType = this.resolveModeType(payload.mode_type);
+    const month = payload.month || dayjs().format("YYYY-MM");
+    this.validateRosterPayload(payload.roster_data);
+
+    const counters = { created: 0, updated: 0, deleted: 0 };
+    const skipped = [];
+    const audits = [];
+    const shiftCache = new Set();
+
+    const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
 
-      for (const employeeId of employeeIds) {
-        const cacheKey = String(employeeId);
-        if (!employeeCache.has(cacheKey)) {
-          const employee =
-            await RosterManageV2Model.findEmployeeByIdForWorkspace(
-              companyId,
-              employeeId,
-            );
+      const employeeIds = Object.keys(payload.roster_data || {});
 
-          if (!employee) {
-            throw new AppError(
-              `พนักงาน ID ${employeeId} ไม่อยู่ในรายการที่อนุญาตสำหรับ Unified Workspace`,
-              400,
-            );
-          }
+      for (const employeeIdStr of employeeIds) {
+        const employeeId = Number(employeeIdStr);
+        if (!employeeId) continue;
 
-          employeeCache.set(cacheKey, employee);
-        }
+        await this.ensureEmployeeAllowed(
+          companyId,
+          employeeId,
+          modeType,
+          connection,
+        );
 
-        const dateMap = rosterData[employeeId] || rosterData[cacheKey] || {};
-        const dateEntries = Object.entries(dateMap);
-
-        for (const [workDate, rawValue] of dateEntries) {
-          if (!this.isValidIsoDate(workDate)) {
-            summary.skipped_invalid += 1;
-            continue;
-          }
-
-          if (this.isPastDate(workDate)) {
-            summary.skipped_past_locked += 1;
-            continue;
-          }
-
-          const action = this.normalizeCellAction(rawValue);
-          if (action.type === "NONE") {
-            continue;
-          }
-
-          if (workspaceMode === "holiday") {
-            if (!["EMPTY", "WEEKLY_OFF"].includes(action.type)) {
-              summary.skipped_invalid += 1;
-              continue;
-            }
-          }
-
-          if (workspaceMode === "shift") {
-            if (!["EMPTY", "SHIFT"].includes(action.type)) {
-              summary.skipped_invalid += 1;
-              continue;
-            }
-          }
-
-          const existing =
-            await RosterManageV2Model.findRosterByEmployeeAndDate(
-              companyId,
-              employeeId,
-              workDate,
-              connection,
-            );
-
-          if (existing && this.isReadOnlyBySystem(existing)) {
-            summary.skipped_readonly += 1;
-            continue;
-          }
-
-          if (
-            workspaceMode === "shift" &&
-            this.isTodayDate(workDate) &&
-            todayWithLogs.has(`${employeeId}|${workDate}`)
-          ) {
-            summary.warning_today_with_logs += 1;
-          }
-
-          if (action.type === "EMPTY") {
-            if (!existing) {
-              continue;
-            }
-
-            if (workspaceMode === "holiday") {
-              // Holiday mode clears explicit weekly-off snapshot but preserves shift override.
-              await RosterManageV2Model.upsertLocalRosterCell(
-                companyId,
-                employeeId,
-                workDate,
-                existing.shift_id || null,
-                "workday",
-                connection,
-              );
-
-              const fresh =
-                await RosterManageV2Model.findRosterByEmployeeAndDate(
-                  companyId,
-                  employeeId,
-                  workDate,
-                  connection,
-                );
-
-              await auditRecord({
-                userId: user.id,
-                companyId,
-                action: "UPDATE",
-                table: "rosters",
-                recordId: fresh?.id || existing.id,
-                oldVal: existing,
-                newVal: fresh || null,
-                ipAddress,
-              });
-
-              summary.updated += 1;
-              summary.touched_employees.add(employeeId);
-              summary.affected_dates.add(workDate);
-              continue;
-            }
-
-            await RosterManageV2Model.deleteRosterByEmployeeAndDate(
-              companyId,
-              employeeId,
-              workDate,
-              connection,
-            );
-
-            await auditRecord({
-              userId: user.id,
-              companyId,
-              action: "DELETE",
-              table: "rosters",
-              recordId: existing.id,
-              oldVal: existing,
-              newVal: null,
-              ipAddress,
-            });
-
-            summary.deleted += 1;
-            summary.touched_employees.add(employeeId);
-            summary.affected_dates.add(workDate);
-            continue;
-          }
-
-          if (action.type === "SHIFT") {
-            const shiftId = Number(action.shiftId);
-            if (!Number.isInteger(shiftId) || shiftId <= 0) {
-              summary.skipped_invalid += 1;
-              continue;
-            }
-
-            if (!shiftCache.has(shiftId)) {
-              const shift = await RosterManageV2Model.findShiftById(
-                companyId,
-                shiftId,
-              );
-              if (!shift) {
-                throw new AppError(`ไม่พบกะงาน ID ${shiftId}`, 400);
-              }
-              shiftCache.add(shiftId);
-            }
-
-            await RosterManageV2Model.upsertLocalRosterCell(
-              companyId,
-              employeeId,
-              workDate,
-              shiftId,
-              "workday",
-              connection,
-            );
-
-            const fresh = await RosterManageV2Model.findRosterByEmployeeAndDate(
-              companyId,
-              employeeId,
-              workDate,
-              connection,
-            );
-
-            await auditRecord({
-              userId: user.id,
-              companyId,
-              action: existing ? "UPDATE" : "INSERT",
-              table: "rosters",
-              recordId: fresh?.id || existing?.id || 0,
-              oldVal: existing || null,
-              newVal: fresh || null,
-              ipAddress,
-            });
-
-            summary[existing ? "updated" : "created"] += 1;
-            summary.touched_employees.add(employeeId);
-            summary.affected_dates.add(workDate);
-            continue;
-          }
-
-          if (action.type === "WEEKLY_OFF") {
-            await RosterManageV2Model.upsertLocalRosterCell(
-              companyId,
-              employeeId,
-              workDate,
-              null,
-              "weekly_off",
-              connection,
-            );
-
-            const fresh = await RosterManageV2Model.findRosterByEmployeeAndDate(
-              companyId,
-              employeeId,
-              workDate,
-              connection,
-            );
-
-            await auditRecord({
-              userId: user.id,
-              companyId,
-              action: existing ? "UPDATE" : "INSERT",
-              table: "rosters",
-              recordId: fresh?.id || existing?.id || 0,
-              oldVal: existing || null,
-              newVal: fresh || null,
-              ipAddress,
-            });
-
-            summary[existing ? "updated" : "created"] += 1;
-            summary.touched_employees.add(employeeId);
-            summary.affected_dates.add(workDate);
-          }
-        }
+        const dateMap = payload.roster_data[employeeIdStr] || {};
+        await this.processEmployeeDateMap({
+          companyId,
+          user,
+          employeeId,
+          dateMap,
+          month,
+          modeType,
+          connection,
+          counters,
+          skipped,
+          audits,
+          shiftCache,
+        });
       }
 
       await connection.commit();
-
-      return {
-        created: summary.created,
-        updated: summary.updated,
-        deleted: summary.deleted,
-        skipped_readonly: summary.skipped_readonly,
-        skipped_invalid: summary.skipped_invalid,
-        skipped_past_locked: summary.skipped_past_locked,
-        warning_today_with_logs: summary.warning_today_with_logs,
-        total_changed: summary.created + summary.updated + summary.deleted,
-        touched_employee_ids: Array.from(summary.touched_employees),
-        affected_dates: Array.from(summary.affected_dates).sort((a, b) =>
-          a.localeCompare(b),
-        ),
-        workspace_mode: workspaceMode,
-      };
     } catch (error) {
       await connection.rollback();
       throw error;
     } finally {
       connection.release();
     }
-  }
 
-  async bulkSave(companyId, user, payload, ipAddress) {
-    return this.bulkUpsert(companyId, user, payload, ipAddress);
-  }
+    for (const audit of audits) {
+      await auditRecord({ ...audit, ipAddress });
+    }
 
-  async bulkUpsertDayType(companyId, user, payload, ipAddress) {
-    return this.bulkUpsert(companyId, user, payload, ipAddress, {
-      mode: "holiday",
-    });
-  }
-
-  async bulkUpsertShift(companyId, user, payload, ipAddress) {
-    return this.bulkUpsert(companyId, user, payload, ipAddress, {
-      mode: "shift",
-    });
+    return {
+      created: counters.created,
+      updated: counters.updated,
+      deleted: counters.deleted,
+      total_changed: counters.created + counters.updated + counters.deleted,
+      skipped,
+      meta: {
+        mode_type: modeType,
+        month,
+      },
+    };
   }
 }
 

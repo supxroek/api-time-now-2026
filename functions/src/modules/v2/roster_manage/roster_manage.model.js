@@ -1,33 +1,43 @@
 const db = require("../../../config/db.config");
 
 class RosterManageV2Model {
-  async findEmployeesForWorkspace(companyId, filters = {}) {
+  getExecutor(executor) {
+    return executor || db;
+  }
+
+  async findEmployeesForMode(companyId, modeType, filters = {}) {
+    const byOffDays = modeType === "off_days";
+
     let query = `
-      SELECT
-        e.id,
-        e.employee_code,
-        e.name,
-        e.image_url,
-        e.department_id,
-        esa.shift_mode,
-        esa.shift_id AS default_shift_id,
-        eda.dayoff_mode,
-        eda.weekly_days
-      FROM employees e
-      LEFT JOIN employee_shift_assignments esa
-        ON esa.company_id = e.company_id
-       AND esa.employee_id = e.id
-       AND esa.effective_to IS NULL
-      LEFT JOIN employee_dayoff_assignments eda
-        ON eda.company_id = e.company_id
-       AND eda.employee_id = e.id
-       AND eda.effective_to IS NULL
-      WHERE e.company_id = ?
-        AND e.deleted_at IS NULL
-        AND e.resign_date IS NULL
-        AND COALESCE(esa.shift_mode, 'normal') = 'custom'
-        AND COALESCE(eda.dayoff_mode, 'normal') = 'custom'
-    `;
+			SELECT
+				e.id,
+				e.employee_code,
+				e.name,
+				e.image_url,
+				e.department_id,
+				d.department_name,
+				e.status,
+				esa.shift_mode,
+				esa.shift_id AS default_shift_id,
+				eda.dayoff_mode,
+				eda.weekly_days
+			FROM employees e
+			LEFT JOIN departments d
+				ON d.id = e.department_id
+			 AND d.company_id = e.company_id
+			LEFT JOIN employee_shift_assignments esa
+				ON esa.company_id = e.company_id
+			 AND esa.employee_id = e.id
+			 AND esa.effective_to IS NULL
+			LEFT JOIN employee_dayoff_assignments eda
+				ON eda.company_id = e.company_id
+			 AND eda.employee_id = e.id
+			 AND eda.effective_to IS NULL
+			WHERE e.company_id = ?
+				AND e.deleted_at IS NULL
+				AND e.resign_date IS NULL
+				AND ${byOffDays ? "eda.dayoff_mode = 'custom'" : "esa.shift_mode = 'custom'"}
+		`;
 
     const params = [companyId];
 
@@ -42,222 +52,324 @@ class RosterManageV2Model {
       params.push(Number(filters.department_id));
     }
 
-    query += " ORDER BY e.name ASC, e.id ASC";
+    query += " ORDER BY e.name ASC";
 
     const [rows] = await db.query(query, params);
     return rows;
   }
 
   async findDepartments(companyId) {
-    const [rows] = await db.query(
-      `
-        SELECT id, department_name
-        FROM departments
-        WHERE company_id = ?
-        ORDER BY department_name ASC
-      `,
-      [companyId],
-    );
-
+    const query = `
+			SELECT id, department_name
+			FROM departments
+			WHERE company_id = ?
+			ORDER BY department_name ASC
+		`;
+    const [rows] = await db.query(query, [companyId]);
     return rows;
   }
 
   async findShifts(companyId) {
-    const [rows] = await db.query(
-      `
-        SELECT id, name, start_time, end_time
-        FROM shifts
-        WHERE company_id = ?
-          AND deleted_at IS NULL
-        ORDER BY name ASC, id ASC
-      `,
-      [companyId],
-    );
+    const query = `
+			SELECT id, name, start_time, end_time
+			FROM shifts
+			WHERE company_id = ?
+				AND deleted_at IS NULL
+			ORDER BY name ASC
+		`;
 
+    const [rows] = await db.query(query, [companyId]);
     return rows;
   }
 
-  async findRostersByDateRange(
+  async findRostersByDateRange(companyId, startDate, endDate, modeType) {
+    const byOffDays = modeType === "off_days";
+
+    const query = `
+			SELECT
+				r.id,
+				r.company_id,
+				r.employee_id,
+				r.work_date,
+				r.shift_id,
+				r.day_type,
+				r.source_system,
+				r.is_ot_allowed,
+				r.resolved_at
+			FROM rosters r
+			INNER JOIN employees e
+				ON e.id = r.employee_id
+			 AND e.company_id = r.company_id
+			 AND e.deleted_at IS NULL
+			 AND e.resign_date IS NULL
+			LEFT JOIN employee_shift_assignments esa
+				ON esa.company_id = e.company_id
+			 AND esa.employee_id = e.id
+			 AND esa.effective_to IS NULL
+			LEFT JOIN employee_dayoff_assignments eda
+				ON eda.company_id = e.company_id
+			 AND eda.employee_id = e.id
+			 AND eda.effective_to IS NULL
+			WHERE r.company_id = ?
+				AND r.work_date BETWEEN ? AND ?
+				AND ${byOffDays ? "eda.dayoff_mode = 'custom'" : "esa.shift_mode = 'custom'"}
+			ORDER BY r.work_date ASC, r.employee_id ASC
+		`;
+
+    const [rows] = await db.query(query, [companyId, startDate, endDate]);
+    return rows;
+  }
+
+  async findDayoffCustomDaysByDateRange(
     companyId,
     startDate,
     endDate,
-    employeeIds = [],
+    modeType,
   ) {
-    let query = `
-      SELECT
-        r.id,
-        r.company_id,
-        r.employee_id,
-        r.work_date,
-        r.shift_id,
-        r.day_type,
-        r.source_system,
-        r.resolved_at
-      FROM rosters r
-      WHERE r.company_id = ?
-        AND r.work_date BETWEEN ? AND ?
-    `;
+    const byOffDays = modeType === "off_days";
 
-    const params = [companyId, startDate, endDate];
+    const query = `
+			SELECT
+				d.id,
+				d.company_id,
+				d.employee_id,
+				d.off_date,
+				d.note,
+				d.created_by,
+				d.created_at
+			FROM employee_dayoff_custom_days d
+			INNER JOIN employees e
+				ON e.id = d.employee_id
+			 AND e.company_id = d.company_id
+			 AND e.deleted_at IS NULL
+			 AND e.resign_date IS NULL
+			LEFT JOIN employee_shift_assignments esa
+				ON esa.company_id = e.company_id
+			 AND esa.employee_id = e.id
+			 AND esa.effective_to IS NULL
+			LEFT JOIN employee_dayoff_assignments eda
+				ON eda.company_id = e.company_id
+			 AND eda.employee_id = e.id
+			 AND eda.effective_to IS NULL
+			WHERE d.company_id = ?
+				AND d.off_date BETWEEN ? AND ?
+				AND ${byOffDays ? "eda.dayoff_mode = 'custom'" : "esa.shift_mode = 'custom'"}
+			ORDER BY d.off_date ASC, d.employee_id ASC
+		`;
 
-    if (Array.isArray(employeeIds) && employeeIds.length > 0) {
-      query += ` AND r.employee_id IN (${employeeIds.map(() => "?").join(",")})`;
-      params.push(...employeeIds);
-    }
-
-    query += " ORDER BY r.work_date ASC, r.employee_id ASC";
-
-    const [rows] = await db.query(query, params);
+    const [rows] = await db.query(query, [companyId, startDate, endDate]);
     return rows;
   }
 
-  async findAttendanceFlagsByDateRange(
-    companyId,
-    startDate,
-    endDate,
-    employeeIds = [],
-  ) {
-    let query = `
-      SELECT
-        ads.employee_id,
-        ads.work_date,
-        ads.first_check_in,
-        ads.last_check_out,
-        ads.attendance_status
-      FROM attendance_daily_summaries ads
-      WHERE ads.company_id = ?
-        AND ads.work_date BETWEEN ? AND ?
-    `;
+  async findEmployeeByIdAndMode(companyId, employeeId, modeType, executor) {
+    const exec = this.getExecutor(executor);
+    const byOffDays = modeType === "off_days";
 
-    const params = [companyId, startDate, endDate];
+    const query = `
+			SELECT
+				e.id,
+				e.company_id,
+				esa.shift_mode,
+				eda.dayoff_mode
+			FROM employees e
+			LEFT JOIN employee_shift_assignments esa
+				ON esa.company_id = e.company_id
+			 AND esa.employee_id = e.id
+			 AND esa.effective_to IS NULL
+			LEFT JOIN employee_dayoff_assignments eda
+				ON eda.company_id = e.company_id
+			 AND eda.employee_id = e.id
+			 AND eda.effective_to IS NULL
+			WHERE e.id = ?
+				AND e.company_id = ?
+				AND e.deleted_at IS NULL
+				AND e.resign_date IS NULL
+				AND ${byOffDays ? "eda.dayoff_mode = 'custom'" : "esa.shift_mode = 'custom'"}
+			LIMIT 1
+		`;
 
-    if (Array.isArray(employeeIds) && employeeIds.length > 0) {
-      query += ` AND ads.employee_id IN (${employeeIds.map(() => "?").join(",")})`;
-      params.push(...employeeIds);
-    }
-
-    query += " ORDER BY ads.work_date ASC, ads.employee_id ASC";
-
-    const [rows] = await db.query(query, params);
-    return rows;
-  }
-
-  async findEmployeeByIdForWorkspace(companyId, employeeId) {
-    const [rows] = await db.query(
-      `
-        SELECT
-          e.id,
-          esa.shift_mode,
-          esa.shift_id AS default_shift_id,
-          eda.dayoff_mode,
-          eda.weekly_days
-        FROM employees e
-        LEFT JOIN employee_shift_assignments esa
-          ON esa.company_id = e.company_id
-         AND esa.employee_id = e.id
-         AND esa.effective_to IS NULL
-        LEFT JOIN employee_dayoff_assignments eda
-          ON eda.company_id = e.company_id
-         AND eda.employee_id = e.id
-         AND eda.effective_to IS NULL
-        WHERE e.company_id = ?
-          AND e.id = ?
-          AND e.deleted_at IS NULL
-          AND e.resign_date IS NULL
-          AND COALESCE(esa.shift_mode, 'normal') = 'custom'
-          AND COALESCE(eda.dayoff_mode, 'normal') = 'custom'
-        LIMIT 1
-      `,
-      [companyId, employeeId],
-    );
-
+    const [rows] = await exec.query(query, [Number(employeeId), companyId]);
     return rows[0] || null;
   }
 
-  async findShiftById(companyId, shiftId) {
-    const [rows] = await db.query(
-      `
-        SELECT id
-        FROM shifts
-        WHERE company_id = ?
-          AND id = ?
-          AND deleted_at IS NULL
-        LIMIT 1
-      `,
-      [companyId, shiftId],
-    );
-
+  async findShiftById(companyId, shiftId, executor) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			SELECT id, company_id, name, start_time, end_time
+			FROM shifts
+			WHERE id = ?
+				AND company_id = ?
+				AND deleted_at IS NULL
+			LIMIT 1
+		`;
+    const [rows] = await exec.query(query, [Number(shiftId), companyId]);
     return rows[0] || null;
   }
 
-  async findRosterByEmployeeAndDate(
-    companyId,
-    employeeId,
-    workDate,
-    executor = db,
-  ) {
-    const [rows] = await executor.query(
-      `
-        SELECT id, employee_id, work_date, shift_id, day_type, source_system
-        FROM rosters
-        WHERE company_id = ?
-          AND employee_id = ?
-          AND work_date = ?
-        LIMIT 1
-      `,
-      [companyId, employeeId, workDate],
-    );
-
+  async findRosterByEmployeeAndDate(companyId, employeeId, workDate, executor) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			SELECT
+				id,
+				company_id,
+				employee_id,
+				work_date,
+				shift_id,
+				day_type,
+				source_system,
+				is_ot_allowed,
+				resolved_at
+			FROM rosters
+			WHERE company_id = ?
+				AND employee_id = ?
+				AND work_date = ?
+			LIMIT 1
+		`;
+    const [rows] = await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      workDate,
+    ]);
     return rows[0] || null;
   }
 
-  async upsertLocalRosterCell(
+  async upsertWorkdayRoster(
     companyId,
     employeeId,
     workDate,
     shiftId,
-    dayType,
-    executor = db,
+    executor,
   ) {
-    const [result] = await executor.query(
-      `
-        INSERT INTO rosters (
-          company_id,
-          employee_id,
-          work_date,
-          shift_id,
-          day_type,
-          source_system,
-          is_ot_allowed
-        )
-        VALUES (?, ?, ?, ?, ?, 'local', 0)
-        ON DUPLICATE KEY UPDATE
-          shift_id = VALUES(shift_id),
-          day_type = VALUES(day_type),
-          source_system = VALUES(source_system),
-          resolved_at = NOW()
-      `,
-      [companyId, employeeId, workDate, shiftId, dayType],
-    );
+    const exec = this.getExecutor(executor);
+    const query = `
+			INSERT INTO rosters (
+				company_id,
+				employee_id,
+				work_date,
+				shift_id,
+				day_type,
+				source_system,
+				is_ot_allowed
+			)
+			VALUES (?, ?, ?, ?, 'workday', 'local', 0)
+			ON DUPLICATE KEY UPDATE
+				shift_id = VALUES(shift_id),
+				day_type = 'workday',
+				source_system = 'local',
+				is_ot_allowed = VALUES(is_ot_allowed)
+		`;
 
-    return result;
+    await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      workDate,
+      Number(shiftId),
+    ]);
   }
 
-  async deleteRosterByEmployeeAndDate(
+  async upsertWeeklyOffRoster(companyId, employeeId, workDate, executor) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			INSERT INTO rosters (
+				company_id,
+				employee_id,
+				work_date,
+				shift_id,
+				day_type,
+				source_system,
+				is_ot_allowed
+			)
+			VALUES (?, ?, ?, NULL, 'weekly_off', 'local', 0)
+			ON DUPLICATE KEY UPDATE
+				shift_id = NULL,
+				day_type = 'weekly_off',
+				source_system = 'local',
+				is_ot_allowed = VALUES(is_ot_allowed)
+		`;
+
+    await exec.query(query, [companyId, Number(employeeId), workDate]);
+  }
+
+  async deleteRosterById(id, companyId, executor) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			DELETE FROM rosters
+			WHERE id = ?
+				AND company_id = ?
+		`;
+    const [result] = await exec.query(query, [Number(id), companyId]);
+    return result.affectedRows || 0;
+  }
+
+  async findDayoffCustomDayByEmployeeAndDate(
     companyId,
     employeeId,
-    workDate,
-    executor = db,
+    offDate,
+    executor,
   ) {
-    await executor.query(
-      `
-        DELETE FROM rosters
-        WHERE company_id = ?
-          AND employee_id = ?
-          AND work_date = ?
-      `,
-      [companyId, employeeId, workDate],
-    );
+    const exec = this.getExecutor(executor);
+    const query = `
+			SELECT
+				id,
+				company_id,
+				employee_id,
+				off_date,
+				note,
+				created_by,
+				created_at
+			FROM employee_dayoff_custom_days
+			WHERE company_id = ?
+				AND employee_id = ?
+				AND off_date = ?
+			LIMIT 1
+		`;
+
+    const [rows] = await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      offDate,
+    ]);
+    return rows[0] || null;
+  }
+
+  async upsertDayoffCustomDay(
+    companyId,
+    employeeId,
+    offDate,
+    createdBy,
+    executor,
+  ) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			INSERT INTO employee_dayoff_custom_days (
+				company_id,
+				employee_id,
+				off_date,
+				note,
+				created_by
+			)
+			VALUES (?, ?, ?, NULL, ?)
+			ON DUPLICATE KEY UPDATE
+				note = VALUES(note)
+		`;
+
+    await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      offDate,
+      Number(createdBy),
+    ]);
+  }
+
+  async deleteDayoffCustomDayById(id, companyId, executor) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			DELETE FROM employee_dayoff_custom_days
+			WHERE id = ?
+				AND company_id = ?
+		`;
+    const [result] = await exec.query(query, [Number(id), companyId]);
+    return result.affectedRows || 0;
   }
 }
 
