@@ -227,6 +227,89 @@ class RosterManageV2Model {
     return rows[0] || null;
   }
 
+  async findShiftCustomDayByEmployeeAndDate(
+    companyId,
+    employeeId,
+    workDate,
+    executor,
+  ) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			SELECT
+				id,
+				company_id,
+				employee_id,
+				work_date,
+				shift_id,
+				created_by,
+				created_at
+			FROM employee_shift_custom_days
+			WHERE company_id = ?
+				AND employee_id = ?
+				AND work_date = ?
+			LIMIT 1
+		`;
+
+    const [rows] = await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      workDate,
+    ]);
+    return rows[0] || null;
+  }
+
+  async upsertShiftCustomDay(
+    companyId,
+    employeeId,
+    workDate,
+    shiftId,
+    createdBy,
+    executor,
+  ) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			INSERT INTO employee_shift_custom_days (
+				company_id,
+				employee_id,
+				work_date,
+				shift_id,
+				created_by
+			)
+			VALUES (?, ?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE
+				shift_id = VALUES(shift_id)
+		`;
+
+    await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      workDate,
+      Number(shiftId),
+      Number(createdBy),
+    ]);
+  }
+
+  async deleteShiftCustomDayByEmployeeAndDate(
+    companyId,
+    employeeId,
+    workDate,
+    executor,
+  ) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			DELETE FROM employee_shift_custom_days
+			WHERE company_id = ?
+				AND employee_id = ?
+				AND work_date = ?
+		`;
+    const [result] = await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      workDate,
+    ]);
+    return result.affectedRows || 0;
+  }
+
   async findRosterByEmployeeAndDate(companyId, employeeId, workDate, executor) {
     const exec = this.getExecutor(executor);
     const query = `

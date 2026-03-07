@@ -55,9 +55,11 @@ class RosterManageV2Service {
     }
   }
 
-  isRosterLocked(rosterRow) {
+  isRosterLocked(rosterRow, modeType = "shifts") {
     if (!rosterRow) return false;
-    if (rosterRow.source_system === "leavehub") return true;
+    if (modeType === "off_days" && rosterRow.source_system === "leavehub") {
+      return true;
+    }
     return !MUTABLE_DAY_TYPES.has(rosterRow.day_type);
   }
 
@@ -168,7 +170,7 @@ class RosterManageV2Service {
   }
 
   canSetOffDay(existingRoster) {
-    if (this.isRosterLocked(existingRoster)) return false;
+    if (this.isRosterLocked(existingRoster, "off_days")) return false;
     const hasWorkShift =
       existingRoster?.day_type === "workday" &&
       existingRoster?.shift_id !== null &&
@@ -203,7 +205,7 @@ class RosterManageV2Service {
     existingCustomDay,
   }) {
     if (!this.canSetOffDay(existingRoster)) {
-      const reason = this.isRosterLocked(existingRoster)
+      const reason = this.isRosterLocked(existingRoster, "off_days")
         ? "locked_by_source_or_day_type"
         : "shift_already_assigned";
       this.pushSkipped(skipped, employeeId, date, reason);
@@ -294,7 +296,7 @@ class RosterManageV2Service {
     skipped,
     date,
   }) {
-    if (this.isRosterLocked(existingRoster)) {
+    if (this.isRosterLocked(existingRoster, "off_days")) {
       this.pushSkipped(
         skipped,
         employeeId,
@@ -357,8 +359,9 @@ class RosterManageV2Service {
     skipped,
     audits,
     existingRoster,
+    existingShiftCustomDay,
   }) {
-    if (this.isRosterLocked(existingRoster)) {
+    if (this.isRosterLocked(existingRoster, "shifts")) {
       this.pushSkipped(
         skipped,
         employeeId,
@@ -366,6 +369,29 @@ class RosterManageV2Service {
         "locked_by_source_or_day_type",
       );
       return;
+    }
+
+    if (existingShiftCustomDay) {
+      const affectedShiftCustomDay =
+        await RosterManageV2Model.deleteShiftCustomDayByEmployeeAndDate(
+          companyId,
+          employeeId,
+          date,
+          connection,
+        );
+
+      if (affectedShiftCustomDay > 0) {
+        counters.deleted += 1;
+        audits.push({
+          userId: user.id,
+          companyId,
+          action: "DELETE",
+          table: "employee_shift_custom_days",
+          recordId: existingShiftCustomDay.id,
+          oldVal: existingShiftCustomDay,
+          newVal: null,
+        });
+      }
     }
 
     if (!this.isLocalWorkday(existingRoster)) {
@@ -408,6 +434,7 @@ class RosterManageV2Service {
     audits,
     existingRoster,
     existingCustomDay,
+    existingShiftCustomDay,
   }) {
     if (shiftId === null) {
       this.pushSkipped(skipped, employeeId, date, "invalid_shift_value");
@@ -419,7 +446,7 @@ class RosterManageV2Service {
       return;
     }
 
-    if (this.isRosterLocked(existingRoster)) {
+    if (this.isRosterLocked(existingRoster, "shifts")) {
       this.pushSkipped(
         skipped,
         employeeId,
@@ -432,6 +459,48 @@ class RosterManageV2Service {
     await this.ensureShiftAllowed(companyId, shiftId, shiftCache, connection);
 
     const numericShiftId = Number(shiftId);
+
+    await RosterManageV2Model.upsertShiftCustomDay(
+      companyId,
+      employeeId,
+      date,
+      numericShiftId,
+      user.id,
+      connection,
+    );
+
+    if (existingShiftCustomDay) {
+      counters.updated += 1;
+      audits.push({
+        userId: user.id,
+        companyId,
+        action: "UPDATE",
+        table: "employee_shift_custom_days",
+        recordId: existingShiftCustomDay.id,
+        oldVal: existingShiftCustomDay,
+        newVal: {
+          ...existingShiftCustomDay,
+          shift_id: numericShiftId,
+        },
+      });
+    } else {
+      counters.created += 1;
+      audits.push({
+        userId: user.id,
+        companyId,
+        action: "INSERT",
+        table: "employee_shift_custom_days",
+        recordId: 0,
+        oldVal: null,
+        newVal: {
+          company_id: companyId,
+          employee_id: Number(employeeId),
+          work_date: date,
+          shift_id: numericShiftId,
+        },
+      });
+    }
+
     await RosterManageV2Model.upsertWorkdayRoster(
       companyId,
       employeeId,
@@ -697,6 +766,14 @@ class RosterManageV2Service {
         connection,
       );
 
+    const existingShiftCustomDay =
+      await RosterManageV2Model.findShiftCustomDayByEmployeeAndDate(
+        companyId,
+        employeeId,
+        date,
+        connection,
+      );
+
     const isClearShift = shiftId === 0 || shiftId === "0" || shiftId === "";
 
     if (isClearShift) {
@@ -710,6 +787,7 @@ class RosterManageV2Service {
         skipped,
         audits,
         existingRoster,
+        existingShiftCustomDay,
       });
       return;
     }
@@ -727,6 +805,7 @@ class RosterManageV2Service {
       audits,
       existingRoster,
       existingCustomDay,
+      existingShiftCustomDay,
     });
   }
 
