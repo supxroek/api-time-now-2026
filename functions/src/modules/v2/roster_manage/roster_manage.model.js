@@ -345,6 +345,8 @@ class RosterManageV2Model {
     executor,
   ) {
     const exec = this.getExecutor(executor);
+    const normalizedShiftId =
+      shiftId === null || shiftId === undefined ? null : Number(shiftId);
     const query = `
 			INSERT INTO rosters (
 				company_id,
@@ -367,8 +369,44 @@ class RosterManageV2Model {
       companyId,
       Number(employeeId),
       workDate,
-      Number(shiftId),
+      normalizedShiftId,
     ]);
+  }
+
+  async findNormalShiftAssignmentByEmployeeAndDate(
+    companyId,
+    employeeId,
+    workDate,
+    executor,
+  ) {
+    const exec = this.getExecutor(executor);
+    const query = `
+			SELECT
+				id,
+				company_id,
+				employee_id,
+				shift_mode,
+				shift_id,
+				effective_from,
+				effective_to
+			FROM employee_shift_assignments
+			WHERE company_id = ?
+				AND employee_id = ?
+				AND shift_mode = 'normal'
+				AND shift_id IS NOT NULL
+				AND effective_from <= ?
+				AND (effective_to IS NULL OR effective_to >= ?)
+			ORDER BY effective_from DESC
+			LIMIT 1
+		`;
+
+    const [rows] = await exec.query(query, [
+      companyId,
+      Number(employeeId),
+      workDate,
+      workDate,
+    ]);
+    return rows[0] || null;
   }
 
   async upsertWeeklyOffRoster(companyId, employeeId, workDate, executor) {

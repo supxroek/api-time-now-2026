@@ -170,12 +170,7 @@ class RosterManageV2Service {
   }
 
   canSetOffDay(existingRoster) {
-    if (this.isRosterLocked(existingRoster, "off_days")) return false;
-    const hasWorkShift =
-      existingRoster?.day_type === "workday" &&
-      existingRoster?.shift_id !== null &&
-      Number(existingRoster?.shift_id) > 0;
-    return !hasWorkShift;
+    return !this.isRosterLocked(existingRoster, "off_days");
   }
 
   isLocalWeeklyOff(existingRoster) {
@@ -327,26 +322,53 @@ class RosterManageV2Service {
       }
     }
 
-    if (this.isLocalWeeklyOff(existingRoster)) {
-      const rosterId = existingRoster?.id;
-      const affected = await RosterManageV2Model.deleteRosterById(
-        rosterId,
+    if (!this.isLocalWeeklyOff(existingRoster)) {
+      return;
+    }
+
+    const shiftCustomDay =
+      await RosterManageV2Model.findShiftCustomDayByEmployeeAndDate(
         companyId,
+        employeeId,
+        date,
         connection,
       );
-      if (affected > 0) {
-        counters.deleted += 1;
-        audits.push({
-          userId: user.id,
+
+    const normalShiftAssignment = shiftCustomDay
+      ? null
+      : await RosterManageV2Model.findNormalShiftAssignmentByEmployeeAndDate(
           companyId,
-          action: "DELETE",
-          table: "rosters",
-          recordId: rosterId,
-          oldVal: existingRoster,
-          newVal: null,
-        });
-      }
-    }
+          employeeId,
+          date,
+          connection,
+        );
+
+    const restoredShiftId =
+      shiftCustomDay?.shift_id ?? normalShiftAssignment?.shift_id ?? null;
+
+    await RosterManageV2Model.upsertWorkdayRoster(
+      companyId,
+      employeeId,
+      date,
+      restoredShiftId,
+      connection,
+    );
+
+    counters.updated += 1;
+    audits.push({
+      userId: user.id,
+      companyId,
+      action: "UPDATE",
+      table: "rosters",
+      recordId: existingRoster.id,
+      oldVal: existingRoster,
+      newVal: {
+        ...existingRoster,
+        shift_id: restoredShiftId,
+        day_type: "workday",
+        source_system: "local",
+      },
+    });
   }
 
   async clearShiftIfPossible({
