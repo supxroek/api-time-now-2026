@@ -110,10 +110,10 @@ const testPool = () => {
 };
 
 // สร้างพูลการเชื่อมต่อ สำหรับแอปหลัก
-// const pool = createPool();
+const pool = createPool();
 
 // สร้างพูลการเชื่อมต่อ สำหรับการทดสอบ
-const pool = testPool();
+// const pool = testPool();
 
 // ส่งออกพูลการเชื่อมต่อ
 module.exports = pool;
