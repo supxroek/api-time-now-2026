@@ -104,14 +104,11 @@ class EmployeeModel {
     return rows;
   }
 
-  async findCompanyDepartmentModuleState(companyId) {
+  async findCompanyDepartmentSetting(companyId) {
     const query = `
-      SELECT cm.is_enabled
-      FROM company_modules cm
-      JOIN modules m
-        ON m.id = cm.module_id
-      WHERE cm.company_id = ?
-        AND m.module_key = 'department'
+      SELECT has_department
+      FROM companies
+      WHERE id = ?
       LIMIT 1
     `;
 

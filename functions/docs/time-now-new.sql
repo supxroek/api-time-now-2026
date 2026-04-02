@@ -32,12 +32,11 @@
 --    3.  DayOff         (employee_dayoff_assignments, employee_dayoff_custom_days)
 --    4.  Integration    (company_integrations)
 --    5.  Devices        (devices, device_access_controls)
---    6.  Modules        (modules, company_modules)
---    7.  OT Templates   (ot_templates)
---    8.  Rosters        (rosters, roster_ot_slots)
---    9.  Attendance     (attendance_logs, attendance_daily_summaries)
---    10. Requests       (requests)
---    11. Audit & Auth   (audit_trail, refresh_tokens)
+--    6.  OT Templates   (ot_templates)
+--    7.  Rosters        (rosters, roster_ot_slots)
+--    8.  Attendance     (attendance_logs, attendance_daily_summaries)
+--    9.  Requests       (requests)
+--    10. Audit & Auth   (audit_trail, refresh_tokens)
 -- ============================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -60,6 +59,7 @@ CREATE TABLE companies
     province       VARCHAR(100)                        NULL,
     postal_code    VARCHAR(10)                         NULL,
     hr_employee_id INT                                 NULL,     -- FK เพิ่มภายหลัง (circular ref)
+    has_department TINYINT(1) DEFAULT 0                NOT NULL,
     report_date    INT       DEFAULT 1                 NOT NULL, -- วันที่ปิดรอบรายงาน (1–31)
     employee_limit INT       DEFAULT 5                 NULL,
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -288,32 +288,7 @@ CREATE TABLE device_access_controls
 );
 
 -- ============================================================
--- 6. MODULES
--- ============================================================
-
-CREATE TABLE modules
-(
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    module_key  VARCHAR(50)  NOT NULL,
-    module_name VARCHAR(100) NOT NULL,
-    CONSTRAINT uq_module_key UNIQUE (module_key)
-);
-
-CREATE TABLE company_modules
-(
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    company_id INT                  NOT NULL,
-    module_id  INT                  NOT NULL,
-    is_enabled TINYINT(1) DEFAULT 1 NOT NULL,
-    config     JSON                 NULL,
-    CONSTRAINT uq_company_module UNIQUE (company_id, module_id),
-    CONSTRAINT fk_cm_company FOREIGN KEY (company_id) REFERENCES companies (id),
-    CONSTRAINT fk_cm_module FOREIGN KEY (module_id) REFERENCES modules (id),
-    INDEX idx_cm_company (company_id)
-);
-
--- ============================================================
--- 7. OT TEMPLATES
+-- 6. OT TEMPLATES
 -- ============================================================
 
 CREATE TABLE ot_templates
@@ -323,7 +298,7 @@ CREATE TABLE ot_templates
     name           VARCHAR(100)                NOT NULL,
     start_time     TIME                        NULL,
     end_time       TIME                        NULL,
-    duration_hours DECIMAL(4, 2)               NULL,
+    duration_minutes INT          DEFAULT 0    NOT NULL,
     overtime_rate  DECIMAL(10, 2) DEFAULT 0.00 NOT NULL,
     is_active      TINYINT(1)     DEFAULT 1    NOT NULL,
     deleted_at     TIMESTAMP                   NULL,
@@ -332,7 +307,7 @@ CREATE TABLE ot_templates
 );
 
 -- ============================================================
--- 8. ROSTERS
+-- 7. ROSTERS
 -- ============================================================
 
 -- Roster = config ของแต่ละวัน: 1 row ต่อ 1 พนักงาน ต่อ 1 วัน
@@ -425,7 +400,7 @@ CREATE TABLE roster_ot_slots
 );
 
 -- ============================================================
--- 9. ATTENDANCE
+-- 8. ATTENDANCE
 -- ============================================================
 
 -- Attendance Logs: บันทึก punch event ดิบ 1 event ต่อ 1 row
@@ -441,15 +416,15 @@ CREATE TABLE attendance_logs
     device_id         INT      NULL,
     log_type          ENUM ('check_in', 'break_start', 'break_end', 'check_out', 'ot_in', 'ot_out') NOT NULL,
     log_timestamp     DATETIME NOT NULL,
-    is_manual         TINYINT(1) DEFAULT 0 NOT NULL,  -- false = จากอุปกรณ์, true = manual โดย HR
-    source_request_id INT      NULL,                  -- FK → requests.id (NULL ถ้า is_manual = false)
+    -- สถานะ ณ ตอนบันทึกเวลา เพื่อตอบโจทย์ "แสดงผลได้ทันที"
+    log_status        ENUM ('normal', 'late', 'early_exit', 'ot', 'invalid') NOT NULL DEFAULT 'normal',
+    
+    is_manual         TINYINT(1) DEFAULT 0 NOT NULL,
+    source_request_id INT      NULL,
     CONSTRAINT fk_al_employee FOREIGN KEY (employee_id) REFERENCES employees (id),
     CONSTRAINT fk_al_roster FOREIGN KEY (roster_id) REFERENCES rosters (id),
     CONSTRAINT fk_al_device FOREIGN KEY (device_id) REFERENCES devices (id) ON DELETE SET NULL,
-    INDEX idx_al_company_date (company_id, log_timestamp),
-    INDEX idx_al_employee_time (employee_id, log_timestamp),
-    INDEX idx_al_roster (roster_id),
-    INDEX idx_al_device (device_id)
+    INDEX idx_al_lookup (employee_id, roster_id, log_type) -- เพิ่ม index เพื่อการดึงประวัติมาเช็คในวันนั้นๆ ได้เร็วขึ้น
 );
 
 -- Attendance Daily Summaries: ผลสรุปการเข้างานระดับวัน (computed table)
@@ -488,15 +463,12 @@ CREATE TABLE attendance_daily_summaries
     total_ot_minutes    INT DEFAULT 0 NOT NULL,  -- OT รวมทุกช่วง
 
     attendance_status   ENUM (
-        'pending',
-        'normal',
-        'late',
-        'early_exit',
-        'late_and_early_exit',
-        'absent',
-        'leave',
-        'holiday'
-    ) NOT NULL DEFAULT 'pending',
+        'present',      -- มาปฏิบัติงาน (สมบูรณ์)
+        'incomplete',   -- ข้อมูลไม่ครบ (เช่น ลืมรูดออก)
+        'absent',       -- ขาดงาน
+        'leave',        -- ลา
+        'holiday'       -- วันหยุด
+    ) NOT NULL DEFAULT 'incomplete',
 
     calculated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
 
@@ -504,12 +476,11 @@ CREATE TABLE attendance_daily_summaries
     CONSTRAINT fk_ads_employee FOREIGN KEY (employee_id) REFERENCES employees (id),
     CONSTRAINT fk_ads_roster FOREIGN KEY (roster_id) REFERENCES rosters (id),
     INDEX idx_ads_company_date (company_id, work_date),
-    INDEX idx_ads_status (company_id, attendance_status, work_date),
-    INDEX idx_ads_roster (roster_id)
+    INDEX idx_ads_status (company_id, attendance_status)
 );
 
 -- ============================================================
--- 10. REQUESTS
+-- 9. REQUESTS
 -- ============================================================
 
 -- คำร้องหลักทุกประเภท รายละเอียดเฉพาะประเภทเก็บใน request_data JSON
@@ -582,7 +553,7 @@ ALTER TABLE attendance_logs
     ADD CONSTRAINT fk_al_source_request FOREIGN KEY (source_request_id) REFERENCES requests (id) ON DELETE SET NULL;
 
 -- ============================================================
--- 11. AUDIT & AUTHENTICATION
+-- 10. AUDIT & AUTHENTICATION
 -- ============================================================
 
 CREATE TABLE audit_trail

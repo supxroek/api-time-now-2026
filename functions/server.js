@@ -7,6 +7,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const winston = require("winston");
 const cookieParser = require("cookie-parser");
+const say = require("cowsay");
 
 // โหลด environment variables จากไฟล์ .env
 require("dotenv").config();
@@ -107,36 +108,47 @@ app.use(routes);
 // Use error middleware
 app.use(errorMiddleware);
 
+// ทดสอบ API ด้วย cow say
+app.get("/cow-say", (_, res) => {
+  const cowMessage = say.say({
+    text: "Hello from TimesNow API!",
+    e: "oO",
+    T: "U ",
+  });
+  res.type("text").send(cowMessage);
+});
+
 // ตรวจสอบการเชื่อมต่อเบื้องต้น
 app.get("/health", (_, res) => {
   // ดึงข้อมูล version จาก package.json
   const pkg = require("./package.json");
   const version = pkg?.version ? pkg.version : "unknown";
   const mem = process.memoryUsage();
-  // เช็คสถานะของ database
-  const db = require("./src/config/db.config");
-  db.getConnection((err, connection) => {
-    let dbStatus = "disconnected";
-    if (!err && connection) {
-      connection.release();
-      dbStatus = "connected";
-    }
-    // สร้าง response สำหรับ health check
-    const healthCheck = {
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      uptime: Math.floor(process.uptime()),
-      environment: NODE_ENV,
-      database: dbStatus,
-      version,
-      memory: {
-        used: `${Math.round(mem.heapUsed / 1024 / 1024)} MB`,
-        total: `${Math.round(mem.heapTotal / 1024 / 1024)} MB`,
-      },
-    };
-    // ส่ง response เป็น JSON
-    res.status(200).json(healthCheck);
-  });
+
+  // ตรวจสอบสถานะการเชื่อมต่อฐานข้อมูล (ตัวอย่างใช้ mysql2)
+  let dbStatus = "unknown";
+  try {
+    const db = require("./src/config/db.config");
+    dbStatus = db?.pool ? "connected" : "not connected";
+  } catch (error) {
+    console.error("Error checking database status:", error);
+  }
+
+  // สร้าง response สำหรับ health check
+  const healthCheck = {
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    environment: NODE_ENV,
+    database: dbStatus,
+    version,
+    memory: {
+      used: `${Math.round(mem.heapUsed / 1024 / 1024)} MB`,
+      total: `${Math.round(mem.heapTotal / 1024 / 1024)} MB`,
+    },
+  };
+
+  res.json(healthCheck);
 });
 
 // จัดการเส้นทางที่ไม่พบด้วยการส่ง 404

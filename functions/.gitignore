@@ -6,6 +6,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+docker-compose-mysql.yml
+docker-compose-sonarqube.yml
+
 # Logs
 logs
 *.log
@@ -24,6 +27,7 @@ src/config/certs/*.pem
 local.settings.json
 *.local
 *.secret
+.vscode
 
 # Node
 node_modules/

@@ -47,10 +47,12 @@ const auditTrailV2Routes = require("./modules/v2/audit_trails/audit_trail.routes
 const integrationV2Routes = require("./modules/v2/integrations/integration.routes");
 const dayResolutionV2Routes = require("./modules/v2/day_resolution/day_resolution.routes");
 const statsV2Routes = require("./modules/v2/stats/stats.routes");
+const reportV2Routes = require("./modules/v2/reports/report.routes");
 const dashboardV2Routes = require("./modules/v2/dashboard/dashboard.routes");
 const timeRecordV2Routes = require("./modules/v2/time_records/time_record.routes");
 const rostersV2Routes = require("./modules/v2/rosters/roster.routes");
 const rosterManageV2Routes = require("./modules/v2/roster_manage/roster_manage.routes");
+const offsiteAssignmentV2Routes = require("./modules/v2/offsite_assignments/offsite_assignment.routes");
 
 // API Version prefix
 const API_VERSION_V1 = "/api";
@@ -100,10 +102,12 @@ router.use(`${API_VERSION_V2}/audit-trails`, auditTrailV2Routes);
 router.use(`${API_VERSION_V2}/integrations`, integrationV2Routes);
 router.use(`${API_VERSION_V2}/day-resolution`, dayResolutionV2Routes);
 router.use(`${API_VERSION_V2}/stats`, statsV2Routes);
+router.use(`${API_VERSION_V2}/reports`, reportV2Routes);
 router.use(`${API_VERSION_V2}/dashboard`, dashboardV2Routes);
 router.use(`${API_VERSION_V2}/time-records`, timeRecordV2Routes);
 router.use(`${API_VERSION_V2}/rosters`, rostersV2Routes);
 router.use(`${API_VERSION_V2}/roster-manage`, rosterManageV2Routes);
+router.use(`${API_VERSION_V2}/offsite-assignments`, offsiteAssignmentV2Routes);
 
 /**
  * API Info route

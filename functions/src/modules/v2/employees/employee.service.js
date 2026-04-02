@@ -100,12 +100,12 @@ class EmployeeService {
       department_id: query.department_id,
     };
 
-    const [employeesRaw, departments, shifts, deptModuleState] =
+    const [employeesRaw, departments, shifts, companySetting] =
       await Promise.all([
         EmployeeModel.findOverviewByCompanyId(companyId, filters, limit),
         EmployeeModel.findDepartmentsByCompanyId(companyId),
         EmployeeModel.findShiftsByCompanyId(companyId),
-        EmployeeModel.findCompanyDepartmentModuleState(companyId),
+        EmployeeModel.findCompanyDepartmentSetting(companyId),
       ]);
 
     const employees = employeesRaw.map((employee) => {
@@ -147,7 +147,7 @@ class EmployeeService {
 
     return {
       company_info: {
-        has_department: Number(deptModuleState?.is_enabled ?? 1),
+        has_department: Number(companySetting?.has_department ?? 1),
       },
       employees,
       departments,

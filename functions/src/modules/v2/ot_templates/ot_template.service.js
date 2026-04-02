@@ -1,5 +1,6 @@
 const AppError = require("../../../utils/AppError");
 const auditRecord = require("../../../utils/audit.record");
+const StatsService = require("../stats/stats.service");
 const OtTemplateModel = require("./ot_template.model");
 
 class OtTemplateService {
@@ -7,7 +8,7 @@ class OtTemplateService {
     "name",
     "start_time",
     "end_time",
-    "duration_hours",
+    "duration_minutes",
     "overtime_rate",
     "is_active",
   ]);
@@ -18,6 +19,7 @@ class OtTemplateService {
     start_time: "เวลาเริ่มต้น",
     end_time: "เวลาสิ้นสุด",
     duration_hours: "ชั่วโมงทำงานล่วงเวลา",
+    duration_minutes: "นาทีทำงานล่วงเวลา",
     overtime_rate: "อัตราค่าตอบแทนล่วงเวลา",
     is_active: "สถานะใช้งาน",
   };
@@ -40,10 +42,10 @@ class OtTemplateService {
       normalized.name = normalized.name?.trim();
     }
     if (
-      normalized.duration_hours !== undefined &&
-      normalized.duration_hours !== null
+      normalized.duration_minutes !== undefined &&
+      normalized.duration_minutes !== null
     ) {
-      normalized.duration_hours = Number(normalized.duration_hours);
+      normalized.duration_minutes = Number(normalized.duration_minutes);
     }
     if (
       normalized.overtime_rate !== undefined &&
@@ -74,11 +76,11 @@ class OtTemplateService {
     }
 
     if (
-      data.duration_hours !== undefined &&
-      data.duration_hours !== null &&
-      Number.isNaN(data.duration_hours)
+      data.duration_minutes !== undefined &&
+      data.duration_minutes !== null &&
+      Number.isNaN(data.duration_minutes)
     ) {
-      throw new AppError("duration_hours ไม่ถูกต้อง", 400);
+      throw new AppError("duration_minutes ไม่ถูกต้อง", 400);
     }
 
     if (
@@ -115,7 +117,7 @@ class OtTemplateService {
       name: cleanData.name,
       start_time: cleanData.start_time ?? null,
       end_time: cleanData.end_time ?? null,
-      duration_hours: cleanData.duration_hours ?? null,
+      duration_minutes: cleanData.duration_minutes ?? 0,
       overtime_rate: cleanData.overtime_rate ?? 0,
       is_active: cleanData.is_active ?? 1,
     };
@@ -170,33 +172,28 @@ class OtTemplateService {
   }
 
   async getOverview(companyId) {
-    const [rows, summaryRow] = await Promise.all([
+    const [statsOverview, rows] = await Promise.all([
+      StatsService.getOverview(companyId),
       OtTemplateModel.findOverviewByCompanyId(companyId),
-      OtTemplateModel.countOverviewByCompanyId(companyId),
     ]);
 
     const templates = (rows || []).map((row) => ({
-      ...row,
-      usage: {
-        count: Number(row.usage_count || 0),
-      },
+      id: row.id,
+      company_id: row.company_id,
+      name: row.name,
+      start_time: row.start_time,
+      end_time: row.end_time,
+      duration_minutes: row.duration_minutes,
+      overtime_rate: row.overtime_rate,
+      is_active: Number(row.is_active || 0) === 1,
+      deleted_at: row.deleted_at,
     }));
 
-    const totalUsage = templates.reduce(
-      (acc, template) => acc + Number(template.usage?.count || 0),
-      0,
-    );
-
     return {
+      contract_version: "v2.ot-templates.overview.2026-03-11",
       templates,
-      summary: {
-        total: Number(summaryRow.total || 0),
-        active_count: Number(summaryRow.active_count || 0),
-        total_usage: totalUsage,
-      },
-      meta: {
-        generated_at: new Date().toISOString(),
-      },
+      stats: statsOverview?.ot || {},
+      generated_at: new Date().toISOString(),
     };
   }
 

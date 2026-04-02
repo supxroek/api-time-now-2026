@@ -17,6 +17,7 @@ class CompanyService {
     "hr_employee_id",
     "report_date",
     "employee_limit",
+    "has_department",
   ]);
 
   filterAllowedFields(payload) {
@@ -45,6 +46,15 @@ class CompanyService {
       data.employee_limit < 1
     ) {
       throw new AppError("employee_limit ต้องมากกว่าหรือเท่ากับ 1", 400);
+    }
+
+    if (data.has_department !== undefined) {
+      const normalized = Number(data.has_department);
+      if (!Number.isInteger(normalized) || ![0, 1].includes(normalized)) {
+        throw new AppError("has_department ต้องเป็น 0 หรือ 1", 400);
+      }
+
+      data.has_department = normalized;
     }
   }
 

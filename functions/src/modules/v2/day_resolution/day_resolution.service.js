@@ -107,7 +107,7 @@ class DayResolutionService {
       return "leave";
     }
 
-    return "pending";
+    return "incomplete";
   }
 
   parseWeeklyDays(value) {

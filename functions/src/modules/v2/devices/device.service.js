@@ -1,5 +1,6 @@
 const AppError = require("../../../utils/AppError");
 const auditRecord = require("../../../utils/audit.record");
+const StatsService = require("../stats/stats.service");
 const DeviceModel = require("./device.model");
 
 class DeviceService {
@@ -21,6 +22,109 @@ class DeviceService {
     });
 
     return filtered;
+  }
+
+  normalizeOverviewLimit(value, fallback, max) {
+    const parsed = Number(value ?? fallback);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return fallback;
+    }
+
+    return Math.min(Math.floor(parsed), max);
+  }
+
+  mapDeviceRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      name: row.name,
+      location_name: row.location_name,
+      description: row.description,
+      hwid: row.hwid,
+      passcode: row.passcode,
+      is_active: Number(row.is_active || 0) === 1,
+      deleted_at: row.deleted_at,
+      access_control_count: Number(row.access_control_count || 0),
+    };
+  }
+
+  mapDepartmentRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      department_name: row.department_name,
+      head_employee_id: row.head_employee_id,
+    };
+  }
+
+  mapEmployeeRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      employee_code: row.employee_code,
+      department_id: row.department_id,
+      department_name: row.department_name,
+      name: row.name,
+      email: row.email,
+      image_url: row.image_url,
+      phone_number: row.phone_number,
+      status: row.status,
+      start_date: row.start_date,
+      resign_date: row.resign_date,
+    };
+  }
+
+  async getOverview(companyId, query = {}) {
+    const deviceLimit = this.normalizeOverviewLimit(
+      query.device_limit,
+      500,
+      1000,
+    );
+    const departmentLimit = this.normalizeOverviewLimit(
+      query.department_limit,
+      500,
+      1000,
+    );
+    const employeeLimit = this.normalizeOverviewLimit(
+      query.employee_limit,
+      2000,
+      3000,
+    );
+    const targetDate = String(
+      query.date || new Date().toISOString().slice(0, 10),
+    );
+
+    const [statsOverview, devicesRaw, departmentsRaw, employeesRaw, activity] =
+      await Promise.all([
+        StatsService.getOverview(companyId),
+        DeviceModel.listDevicesForOverview(companyId, deviceLimit),
+        DeviceModel.listDepartmentsForOverview(companyId, departmentLimit),
+        DeviceModel.listEmployeesForOverview(companyId, employeeLimit),
+        DeviceModel.getTodayDeviceActivity(companyId, targetDate),
+      ]);
+
+    const devices = devicesRaw.map((row) => this.mapDeviceRow(row));
+    const departments = departmentsRaw.map((row) => this.mapDepartmentRow(row));
+    const employees = employeesRaw.map((row) => this.mapEmployeeRow(row));
+
+    return {
+      contract_version: "v2.devices.overview.2026-03-11",
+      stats: statsOverview?.devices || {},
+      device_activity: activity,
+      devices: {
+        total: devices.length,
+        items: devices,
+      },
+      departments: {
+        total: departments.length,
+        items: departments,
+      },
+      employees: {
+        total: employees.length,
+        items: employees,
+      },
+      generated_at: new Date().toISOString(),
+    };
   }
 
   async getAllDevices(companyId, query) {

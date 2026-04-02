@@ -14,9 +14,15 @@ NODE_ENV=production
 npm run deploy
 ```
 
+or
+
+```bash
+pnpm run deploy
+```
+
 ### 3. Access the API
 
-- After deployment, you can access the API at the following URL: <https://api-wra4rpnf3a-as.a.run.app/api}>
+- After deployment, you can access the API at the following URL: <https://api-wra4rpnf3a-as.a.run.app/api>
 
 ### 4. Test the API
 

@@ -1,9 +1,53 @@
 const AppError = require("../../../utils/AppError");
 const auditRecord = require("../../../utils/audit.record");
+const StatsService = require("../stats/stats.service");
 const DepartmentModel = require("./department.model");
 
 class DepartmentService {
   static ALLOWED_FIELDS = new Set(["department_name", "head_employee_id"]);
+
+  normalizeOverviewLimit(value, fallback, max) {
+    const parsed = Number(value ?? fallback);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return fallback;
+    }
+
+    return Math.min(Math.floor(parsed), max);
+  }
+
+  mapDepartmentRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      department_name: row.department_name,
+      head_employee_id: row.head_employee_id,
+      head_employee: row.head_employee_id
+        ? {
+            id: row.head_employee_id,
+            name: row.head_employee_name,
+            employee_code: row.head_employee_code,
+          }
+        : null,
+      employee_count: Number(row.employee_count || 0),
+    };
+  }
+
+  mapEmployeeRow(row) {
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      employee_code: row.employee_code,
+      department_id: row.department_id,
+      department_name: row.department_name,
+      name: row.name,
+      email: row.email,
+      image_url: row.image_url,
+      phone_number: row.phone_number,
+      status: row.status,
+      start_date: row.start_date,
+      resign_date: row.resign_date,
+    };
+  }
 
   filterAllowedFields(payload) {
     const filtered = {};
@@ -15,6 +59,42 @@ class DepartmentService {
     });
 
     return filtered;
+  }
+
+  async getOverview(companyId, query = {}) {
+    const departmentLimit = this.normalizeOverviewLimit(
+      query.department_limit,
+      500,
+      1000,
+    );
+    const employeeLimit = this.normalizeOverviewLimit(
+      query.employee_limit,
+      2000,
+      3000,
+    );
+
+    const [statsOverview, departmentsRaw, employeesRaw] = await Promise.all([
+      StatsService.getOverview(companyId),
+      DepartmentModel.listDepartmentsForOverview(companyId, departmentLimit),
+      DepartmentModel.listEmployeesForOverview(companyId, employeeLimit),
+    ]);
+
+    const departments = departmentsRaw.map((row) => this.mapDepartmentRow(row));
+    const employees = employeesRaw.map((row) => this.mapEmployeeRow(row));
+
+    return {
+      contract_version: "v2.departments.overview.2026-03-11",
+      stats: statsOverview?.departments || {},
+      departments: {
+        total: departments.length,
+        items: departments,
+      },
+      employees: {
+        total: employees.length,
+        items: employees,
+      },
+      generated_at: new Date().toISOString(),
+    };
   }
 
   async validateHeadEmployee(companyId, headEmployeeId) {

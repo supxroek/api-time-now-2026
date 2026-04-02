@@ -2,6 +2,18 @@ const catchAsync = require("../../../utils/catchAsync");
 const DepartmentService = require("./department.service");
 
 class DepartmentController {
+  getOverview = catchAsync(async (req, res, _next) => {
+    const result = await DepartmentService.getOverview(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   create = catchAsync(async (req, res, _next) => {
     const department = await DepartmentService.createDepartment(
       req.user,

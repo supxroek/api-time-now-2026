@@ -3,13 +3,14 @@ const nodemailer = require("nodemailer");
 // โหลดตัวแปรสภาพแวดล้อมจากไฟล์ .env
 require("dotenv").config();
 
-// โหลดค่าการตั้งค่าอีเมลจากตัวแปรสภาพแวดล้อม
 const {
+  // สำหรับ SMTP
   EMAIL_FROM_NAME,
   EMAIL_FROM_ADDRESS,
-  EMAIL_CLIENT_ID,
-  EMAIL_CLIENT_SECRET,
-  EMAIL_REFRESH_TOKEN,
+  MEMAIL_SMTP_HOST,
+  MEMAIL_SMTP_PORT,
+  MEMAIL_SMTP_USER,
+  MEMAIL_SMTP_PASS,
 } = process.env;
 
 class MailConfig {
@@ -17,22 +18,21 @@ class MailConfig {
   constructor() {
     this.fromName = EMAIL_FROM_NAME;
     this.fromAddress = EMAIL_FROM_ADDRESS;
-    this.clientId = EMAIL_CLIENT_ID;
-    this.clientSecret = EMAIL_CLIENT_SECRET;
-    this.refreshToken = EMAIL_REFRESH_TOKEN;
+    this.host = MEMAIL_SMTP_HOST;
+    this.port = Number(MEMAIL_SMTP_PORT) || 587;
+    this.user = MEMAIL_SMTP_USER;
+    this.pass = MEMAIL_SMTP_PASS;
   }
 
-  // ฟังก์ชันสร้าง transporter สำหรับส่งอีเมล
+  // ฟังก์ชันสร้าง transporter สำหรับส่งอีเมล ผ่าน SMTP
   createTransporter() {
-    // สร้าง transporter สำหรับส่งอีเมล
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: this.host,
+      port: this.port, // 587 → STARTTLS
+      secure: this.port === 465, // ถ้าใช้ 465/2465 ค่อยให้เป็น true
       auth: {
-        type: "OAuth2",
-        user: this.fromAddress,
-        clientId: this.clientId,
-        clientSecret: this.clientSecret,
-        refreshToken: this.refreshToken,
+        user: this.user,
+        pass: this.pass,
       },
     });
     return transporter;

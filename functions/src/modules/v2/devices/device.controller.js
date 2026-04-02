@@ -3,6 +3,18 @@ const AppError = require("../../../utils/AppError");
 const DeviceService = require("./device.service");
 
 class DeviceController {
+  getOverview = catchAsync(async (req, res, _next) => {
+    const result = await DeviceService.getOverview(
+      req.user.company_id,
+      req.query,
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
+
   create = catchAsync(async (req, res, next) => {
     if (!req.body.name || !req.body.hwid) {
       return next(new AppError("กรุณาระบุชื่ออุปกรณ์และ HWID", 400));

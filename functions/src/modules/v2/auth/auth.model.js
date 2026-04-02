@@ -34,6 +34,7 @@ class AuthModel {
         u.company_id,
         u.employee_id,
         u.email,
+        u.password_hash,
         u.role,
         u.is_active,
         u.last_login,
@@ -100,6 +101,28 @@ class AuthModel {
     `;
 
     await db.query(query, [tokenId]);
+  }
+
+  async updatePasswordHash(userId, passwordHash) {
+    const query = `
+      UPDATE users
+      SET password_hash = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `;
+
+    await db.query(query, [passwordHash, userId]);
+  }
+
+  async revokeAllRefreshTokensByUserId(userId) {
+    const query = `
+      UPDATE refresh_tokens
+      SET is_revoked = 1
+      WHERE user_id = ?
+        AND is_revoked = 0
+    `;
+
+    await db.query(query, [userId]);
   }
 }
 

@@ -10,6 +10,18 @@ class CompanyModel {
     return rows[0] || null;
   }
 
+  async getHasDepartmentByCompanyId(companyId) {
+    const query = `
+      SELECT id, has_department
+      FROM companies
+      WHERE id = ?
+      LIMIT 1
+    `;
+
+    const [rows] = await db.query(query, [companyId]);
+    return rows[0] || null;
+  }
+
   async updateProfileByCompanyId(companyId, data) {
     const keys = Object.keys(data);
     if (!keys.length) {
@@ -26,6 +38,16 @@ class CompanyModel {
     `;
 
     await db.query(query, [...values, companyId]);
+  }
+
+  async updateHasDepartmentByCompanyId(companyId, hasDepartment) {
+    const query = `
+      UPDATE companies
+      SET has_department = ?
+      WHERE id = ?
+    `;
+
+    await db.query(query, [hasDepartment, companyId]);
   }
 
   async listEmployeesForOverview(companyId, limit = 1000) {

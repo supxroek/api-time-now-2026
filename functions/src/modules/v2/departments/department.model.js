@@ -1,6 +1,70 @@
 const db = require("../../../config/db.config");
 
 class DepartmentModel {
+  async listDepartmentsForOverview(companyId, limit = 500) {
+    const query = `
+      SELECT
+        d.id,
+        d.company_id,
+        d.department_name,
+        d.head_employee_id,
+        e.name AS head_employee_name,
+        e.employee_code AS head_employee_code,
+        COUNT(emp.id) AS employee_count
+      FROM departments d
+      LEFT JOIN employees e
+        ON e.id = d.head_employee_id
+       AND e.company_id = d.company_id
+       AND e.deleted_at IS NULL
+      LEFT JOIN employees emp
+        ON emp.department_id = d.id
+       AND emp.company_id = d.company_id
+       AND emp.deleted_at IS NULL
+      WHERE d.company_id = ?
+      GROUP BY
+        d.id,
+        d.company_id,
+        d.department_name,
+        d.head_employee_id,
+        e.name,
+        e.employee_code
+      ORDER BY d.department_name ASC, d.id ASC
+      LIMIT ?
+    `;
+
+    const [rows] = await db.query(query, [companyId, limit]);
+    return rows;
+  }
+
+  async listEmployeesForOverview(companyId, limit = 2000) {
+    const query = `
+      SELECT
+        e.id,
+        e.company_id,
+        e.employee_code,
+        e.department_id,
+        e.name,
+        e.email,
+        e.image_url,
+        e.phone_number,
+        e.status,
+        e.start_date,
+        e.resign_date,
+        d.department_name
+      FROM employees e
+      LEFT JOIN departments d
+        ON d.id = e.department_id
+       AND d.company_id = e.company_id
+      WHERE e.company_id = ?
+        AND e.deleted_at IS NULL
+      ORDER BY e.name ASC, e.id ASC
+      LIMIT ?
+    `;
+
+    const [rows] = await db.query(query, [companyId, limit]);
+    return rows;
+  }
+
   async create(data) {
     const keys = Object.keys(data);
     const values = keys.map((key) => data[key]);

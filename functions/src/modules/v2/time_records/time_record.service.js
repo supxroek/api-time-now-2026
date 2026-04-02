@@ -1,4 +1,5 @@
 const AppError = require("../../../utils/AppError");
+const StatsService = require("../stats/stats.service");
 const TimeRecordModel = require("./time_record.model");
 
 class TimeRecordService {
@@ -11,15 +12,26 @@ class TimeRecordService {
     ot_out: "OT ออก",
   };
 
+  static LOG_STATUS_LABELS = {
+    normal: "ปกติ",
+    late: "มาสาย",
+    early_exit: "ออกก่อนเวลา",
+    ot: "OT",
+    invalid: "ไม่ถูกต้อง",
+    none: "ว่าง",
+  };
+
   static ATTENDANCE_STATUS_LABELS = {
+    present: "มาทำงาน",
+    incomplete: "ข้อมูลไม่ครบ",
+    absent: "ขาดงาน",
+    leave: "ลา",
+    holiday: "วันหยุด",
     pending: "รอดำเนินการ",
     normal: "ปกติ",
     late: "มาสาย",
     early_exit: "ออกก่อนเวลา",
     late_and_early_exit: "มาสายและออกก่อนเวลา",
-    absent: "ขาดงาน",
-    leave: "ลา",
-    holiday: "วันหยุด",
     none: "ว่าง",
   };
 
@@ -66,11 +78,20 @@ class TimeRecordService {
       employee_id: row.employee_id,
       device_id: row.device_id,
       log_type: this.mapEnum(row.log_type, TimeRecordService.LOG_TYPE_LABELS),
+      log_status: this.mapEnum(
+        row.log_status || "none",
+        TimeRecordService.LOG_STATUS_LABELS,
+      ),
       log_timestamp: row.log_timestamp,
       is_manual: Boolean(row.is_manual),
-      status: this.mapEnum(
+      day_status: this.mapEnum(
         row.attendance_status || "none",
         TimeRecordService.ATTENDANCE_STATUS_LABELS,
+      ),
+      // Backward compatibility for existing FE usage.
+      status: this.mapEnum(
+        row.log_status || "none",
+        TimeRecordService.LOG_STATUS_LABELS,
       ),
       employee: {
         id: row.employee_id,
@@ -107,6 +128,13 @@ class TimeRecordService {
         row.latest_status || "none",
         TimeRecordService.ATTENDANCE_STATUS_LABELS,
       ),
+      metrics: {
+        total_work_minutes: Number(row.total_work_minutes || 0),
+        break_minutes: Number(row.break_minutes || 0),
+        late_minutes: Number(row.late_minutes || 0),
+        early_exit_minutes: Number(row.early_exit_minutes || 0),
+        total_ot_minutes: Number(row.total_ot_minutes || 0),
+      },
     };
   }
 
@@ -185,14 +213,14 @@ class TimeRecordService {
 
     const [
       departments,
-      statsRow,
+      statsOverview,
       logsRows,
       logsTotal,
       summaryTotal,
       summaryRows,
     ] = await Promise.all([
       TimeRecordModel.getDepartmentOptions(companyId),
-      TimeRecordModel.getOverviewStats(companyId, selectedDate, summaryFilters),
+      StatsService.getOverview(companyId),
       TimeRecordModel.getRealtimeLogs(companyId, logFilters, limit, offset),
       TimeRecordModel.countRealtimeLogs(companyId, logFilters),
       TimeRecordModel.countActiveEmployees(companyId, summaryFilters),
@@ -206,10 +234,15 @@ class TimeRecordService {
     ]);
 
     const stats = {
-      total_employees: Number(statsRow.total_employees || 0),
-      came_to_work: Number(statsRow.came_to_work || 0),
-      late: Number(statsRow.late || 0),
-      absent: Number(statsRow.absent || 0),
+      duplicate: statsOverview?.duplicate || {},
+      dashboard: statsOverview?.dashboard || {},
+      attendance_logs: statsOverview?.attendance_logs || {},
+      cards: {
+        total_employees: Number(statsOverview?.duplicate?.total_employees || 0),
+        on_time_today: Number(statsOverview?.attendance_logs?.on_time || 0),
+        late_today: Number(statsOverview?.duplicate?.late_today || 0),
+        absent_today: Number(statsOverview?.duplicate?.absent_today || 0),
+      },
     };
 
     return {

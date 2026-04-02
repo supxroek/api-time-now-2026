@@ -68,6 +68,53 @@ class AuthController {
       data: { user },
     });
   });
+
+  forgotPassword = catchAsync(async (req, res, _next) => {
+    const { email } = req.body;
+    await AuthService.forgotPassword(email);
+
+    res.status(200).json({
+      status: "success",
+      message:
+        "หากอีเมลนี้มีอยู่ในระบบ เราจะส่งคำแนะนำในการรีเซ็ตรหัสผ่านให้คุณทางอีเมล",
+    });
+  });
+
+  resetPassword = catchAsync(async (req, res, next) => {
+    const token = req.body?.token || req.query?.token;
+    const newPassword = req.body?.newPassword || req.body?.password;
+
+    if (!token) {
+      return next(new AppError("ไม่พบ Token สำหรับรีเซ็ตรหัสผ่าน", 400));
+    }
+
+    if (!newPassword) {
+      return next(new AppError("กรุณาระบุรหัสผ่านใหม่", 400));
+    }
+
+    await AuthService.resetPassword(token, newPassword);
+
+    res.status(200).json({
+      status: "success",
+      message:
+        "รีเซ็ตรหัสผ่านเรียบร้อยแล้ว คุณสามารถเข้าสู่ระบบด้วยรหัสผ่านใหม่ได้ทันที",
+    });
+  });
+
+  validateResetPasswordLink = catchAsync(async (req, res, next) => {
+    const token = req.query?.token;
+
+    if (!token) {
+      return next(new AppError("ไม่พบ Token สำหรับรีเซ็ตรหัสผ่าน", 400));
+    }
+
+    const result = await AuthService.validateResetPasswordLink(token);
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  });
 }
 
 module.exports = new AuthController();

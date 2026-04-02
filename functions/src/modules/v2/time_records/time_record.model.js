@@ -47,41 +47,6 @@ class TimeRecordModel {
     return Number(rows[0]?.total || 0);
   }
 
-  async getOverviewStats(companyId, targetDate, filters = {}) {
-    const employeeFilter = this.buildEmployeeFilters(filters);
-
-    const query = `
-      SELECT
-        COUNT(*) AS total_employees,
-        SUM(CASE WHEN ads.attendance_status IN ('normal', 'late', 'early_exit', 'late_and_early_exit') THEN 1 ELSE 0 END) AS came_to_work,
-        SUM(CASE WHEN ads.attendance_status IN ('late', 'late_and_early_exit') THEN 1 ELSE 0 END) AS late,
-        SUM(CASE WHEN ads.attendance_status = 'absent' THEN 1 ELSE 0 END) AS absent
-      FROM employees e
-      LEFT JOIN attendance_daily_summaries ads
-        ON ads.company_id = e.company_id
-       AND ads.employee_id = e.id
-       AND ads.work_date = ?
-      WHERE e.company_id = ?
-        AND e.deleted_at IS NULL
-        AND e.status = 'active'
-        ${employeeFilter.clause}
-    `;
-
-    const [rows] = await db.query(query, [
-      targetDate,
-      companyId,
-      ...employeeFilter.params,
-    ]);
-    return (
-      rows[0] || {
-        total_employees: 0,
-        came_to_work: 0,
-        late: 0,
-        absent: 0,
-      }
-    );
-  }
-
   buildRealtimeLogFilters(filters = {}) {
     let clause = "";
     const params = [];
@@ -125,6 +90,7 @@ class TimeRecordModel {
         al.employee_id,
         al.device_id,
         al.log_type,
+        al.log_status,
         al.log_timestamp,
         al.is_manual,
         e.employee_code,
@@ -203,7 +169,12 @@ class TimeRecordModel {
         lp.check_out_time,
         lp.ot_in_time,
         lp.ot_out_time,
-        ads.attendance_status AS latest_status
+        ads.attendance_status AS latest_status,
+        ads.total_work_minutes,
+        ads.break_minutes,
+        ads.late_minutes,
+        ads.early_exit_minutes,
+        ads.total_ot_minutes
       FROM employees e
       LEFT JOIN departments d
         ON d.id = e.department_id

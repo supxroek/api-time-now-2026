@@ -9,8 +9,8 @@ class AuditTrailService {
   };
 
   static USER_ROLE_LABELS = {
-    super_admin: "ผู้ดูแลระบบสูงสุด",
-    admin: "ผู้ดูแลระบบ",
+    super_admin: "แอดมินสูงสุด",
+    admin: "แอดมิน",
     manager: "ผู้จัดการ",
   };
 

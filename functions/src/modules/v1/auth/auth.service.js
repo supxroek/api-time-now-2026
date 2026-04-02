@@ -56,7 +56,8 @@ class AuthService {
     // 1. ค้นหาผู้ใช้
     const user = await AuthModel.findUserByEmail(email);
     if (!user) {
-      throw new AppError("ไม่พบผู้ใช้งานที่มีอีเมลนี้", 404);
+      // เพื่อความปลอดภัย ไม่บอกว่าปัญหาเกิดจากอีเมลหรือรหัสผ่าน
+      throw new AppError("อีเมลหรือรหัสผ่านไม่ถูกต้อง", 401);
     }
 
     // 2. ตรวจสอบรหัสผ่าน
@@ -141,7 +142,11 @@ class AuthService {
   async forgotPassword(email) {
     const user = await AuthModel.findUserByEmail(email);
     if (!user) {
-      throw new AppError("ไม่พบผู้ใช้งานที่มีอีเมลนี้", 404);
+      // เพื่อความปลอดภัย ไม่บอกว่าปัญหาเกิดจากอีเมลหรือไม่
+      throw new AppError(
+        "หากอีเมลนี้มีอยู่ในระบบ เราจะส่งลิงก์รีเซ็ตรหัสผ่านให้คุณ",
+        200,
+      );
     }
     // TODO: Generate Reset Token/Link and Send Email
     // For now, return success message or mock token

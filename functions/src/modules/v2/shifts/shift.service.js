@@ -247,20 +247,19 @@ class ShiftService {
   async updateShift(user, shiftId, payload, ipAddress) {
     const companyId = user.company_id;
     const oldShift = await ShiftModel.findByIdAndCompanyId(shiftId, companyId);
-    console.log("Old Shift:", oldShift);
     if (!oldShift) {
       throw new AppError("ไม่พบข้อมูลกะการทำงานที่ต้องการแก้ไข", 404);
     }
 
     const cleanData = this.normalizeData(this.filterAllowedFields(payload));
-    console.log("Clean Data:", cleanData);
     this.validateData(cleanData, { requiredFields: ["name"] });
 
     // ตรวจสอบชื่อซ้ำเมื่อมีการเปลี่ยนชื่อ
-    if (cleanData.name && cleanData.name == oldShift.name) {
+    if (cleanData.name && cleanData.name !== oldShift.name) {
       const duplicate = await ShiftModel.findByNameAndCompanyId(
         cleanData.name,
         companyId,
+        Number(shiftId),
       );
       if (duplicate) {
         throw new AppError(

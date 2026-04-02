@@ -1,6 +1,100 @@
 const db = require("../../../config/db.config");
 
 class DeviceModel {
+  async listDevicesForOverview(companyId, limit = 500) {
+    const query = `
+      SELECT
+        d.id,
+        d.company_id,
+        d.name,
+        d.location_name,
+        d.description,
+        d.hwid,
+        d.passcode,
+        d.is_active,
+        d.deleted_at,
+        (
+          SELECT COUNT(*)
+          FROM device_access_controls dac
+          WHERE dac.device_id = d.id
+        ) AS access_control_count
+      FROM devices d
+      WHERE d.company_id = ?
+        AND d.deleted_at IS NULL
+      ORDER BY d.id DESC
+      LIMIT ?
+    `;
+
+    const [rows] = await db.query(query, [companyId, limit]);
+    return rows;
+  }
+
+  async listDepartmentsForOverview(companyId, limit = 500) {
+    const query = `
+      SELECT
+        d.id,
+        d.company_id,
+        d.department_name,
+        d.head_employee_id
+      FROM departments d
+      WHERE d.company_id = ?
+      ORDER BY d.department_name ASC, d.id ASC
+      LIMIT ?
+    `;
+
+    const [rows] = await db.query(query, [companyId, limit]);
+    return rows;
+  }
+
+  async listEmployeesForOverview(companyId, limit = 2000) {
+    const query = `
+      SELECT
+        e.id,
+        e.company_id,
+        e.employee_code,
+        e.department_id,
+        e.name,
+        e.email,
+        e.image_url,
+        e.phone_number,
+        e.status,
+        e.start_date,
+        e.resign_date,
+        d.department_name
+      FROM employees e
+      LEFT JOIN departments d
+        ON d.id = e.department_id
+       AND d.company_id = e.company_id
+      WHERE e.company_id = ?
+        AND e.deleted_at IS NULL
+      ORDER BY e.name ASC, e.id ASC
+      LIMIT ?
+    `;
+
+    const [rows] = await db.query(query, [companyId, limit]);
+    return rows;
+  }
+
+  async getTodayDeviceActivity(companyId, targetDate) {
+    const query = `
+      SELECT
+        COUNT(*) AS today_logs
+      FROM attendance_logs al
+      WHERE al.company_id = ?
+        AND al.device_id IS NOT NULL
+        AND DATE(al.log_timestamp) = ?
+    `;
+
+    const [rows] = await db.query(query, [companyId, targetDate]);
+    const stat = rows[0] || {};
+
+    return {
+      today: Number(stat.today_logs || 0),
+      success: Number(stat.today_logs || 0),
+      failed: 0,
+    };
+  }
+
   async create(data) {
     const keys = Object.keys(data);
     const values = keys.map((key) => data[key]);

@@ -344,7 +344,7 @@ class IntegrationModel {
         ads.attendance_status = CASE
           WHEN r.day_type IN ('weekly_off', 'public_holiday', 'compensated_holiday', 'holiday_swap') THEN 'holiday'
           WHEN r.day_type IN ('annual_leave', 'sick_leave', 'private_leave', 'unpaid_leave', 'other_leave') THEN 'leave'
-          ELSE 'pending'
+          ELSE 'incomplete'
         END,
         ads.calculated_at = NOW()
       WHERE ads.roster_id IN (${placeholders})
@@ -374,7 +374,7 @@ class IntegrationModel {
         ads.attendance_status = CASE
           WHEN r.day_type IN ('weekly_off', 'public_holiday', 'compensated_holiday', 'holiday_swap') THEN 'holiday'
           WHEN r.day_type IN ('annual_leave', 'sick_leave', 'private_leave', 'unpaid_leave', 'other_leave') THEN 'leave'
-          ELSE 'pending'
+          ELSE 'incomplete'
         END,
         ads.calculated_at = NOW()
       WHERE r.company_id = ?

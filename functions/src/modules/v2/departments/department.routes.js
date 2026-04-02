@@ -7,6 +7,14 @@ const router = express.Router();
 router.use(protect);
 
 router
+  // Endpoint: GET /api/v2/departments/overview
+  .route("/overview")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    departmentController.getOverview,
+  );
+
+router
   // Endpoint: GET /api/v2/departments
   .route("/")
   .get(

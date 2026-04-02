@@ -7,20 +7,28 @@ const router = express.Router();
 router.use(protect);
 
 router
-    // Endpoint: GET /api/v2/devices
+  // Endpoint: GET /api/v2/devices/overview
+  .route("/overview")
+  .get(
+    restrictTo("super_admin", "admin", "manager"),
+    deviceController.getOverview,
+  );
+
+router
+  // Endpoint: GET /api/v2/devices
   .route("/")
   .get(restrictTo("super_admin", "admin", "manager"), deviceController.getAll)
   .post(restrictTo("super_admin", "admin"), deviceController.create);
 
 router
-    // Endpoint: GET /api/v2/devices/:id
+  // Endpoint: GET /api/v2/devices/:id
   .route("/:id")
   .get(restrictTo("super_admin", "admin", "manager"), deviceController.getOne)
   .patch(restrictTo("super_admin", "admin"), deviceController.update)
   .delete(restrictTo("super_admin", "admin"), deviceController.delete);
 
 router
-    // Endpoint: GET /api/v2/devices/:id/access-controls
+  // Endpoint: GET /api/v2/devices/:id/access-controls
   .route("/:id/access-controls")
   .get(
     restrictTo("super_admin", "admin", "manager"),
